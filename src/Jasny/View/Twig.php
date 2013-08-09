@@ -65,7 +65,7 @@ class Twig extends \Jasny\View
      */
     public static function init($path, $cache=false)
     {
-        if (!isset(self::$default)) self::$default = get_called_class();
+        if (!isset(self::$default)) self::$default = '\\' . get_called_class();
         
         $loader = new \Twig_Loader_Filesystem($path);
 

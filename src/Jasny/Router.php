@@ -9,7 +9,7 @@ namespace Jasny;
  *  ?          Single character
  *  #          One or more digits (custom extension)
  *  *          One or more characters
- *  **         Any number of characters cross subdirs
+ *  **         Any number of subdirs
  *  [abc]      Match character 'a', 'b' or 'c'
  *  [a-z]      Match character 'a' to 'z'
  *  {png,gif}  Match 'png' or 'gif'
@@ -58,6 +58,7 @@ class Router
     public static function i()
     {
         if (!isset(self::$instance)) self::$instance = new static();
+        return self::$instance;
     }
     
     
@@ -207,16 +208,19 @@ class Router
      * 
      * @return mixed  Whatever the controller returns
      */
-    public static function execute()
+    public function execute()
     {
         $route = $this->getRoute();
         
+        // No route
+        if (!$route) return $this->notFound();
+        
         // Route to file
-        if (isset($route['file'])) {
-            $file = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . ltrim(static::rebase($route['file']), '/');
+        if (isset($route->file)) {
+            $file = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . ltrim(static::rebase($route->file), '/');
             
             if (!file_exists($file)) {
-                trigger_error("Failed to route using '{$route['route']}': File '$file' doesn't exist."
+                trigger_error("Failed to route using '{$route->route}': File '$file' doesn't exist."
                     , E_USER_WARNING);
                 return $this->notFound();
             }
@@ -225,15 +229,17 @@ class Router
         }
         
         // Route to controller
-        if (empty($route['controller']) || empty($route['action'])) {
-            trigger_error("Failed to route using '{$route['route']}': "
-                . (empty($route['controller']) ? 'Controller' : 'Action') . " is not set", E_USER_WARNING);
+        if (empty($route->controller) || empty($route->action)) {
+            trigger_error("Failed to route using '{$route->route}': "
+                . (empty($route->controller) ? 'Controller' : 'Action') . " is not set", E_USER_WARNING);
             return $this->notFound();
         }
         
-        $class = $route['controller'] . 'Controller';
-        $method = $route['action'] . 'Action';
-        $args = isset($route['args']) ? $route['args'] : [];
+        $class = ucfirst($route->controller) . 'Controller';
+        $method = $route->action . 'Action';
+        $args = isset($route->args) ? $route->args : [];
+ 
+        if (!class_exists($class)) return $this->notFound();
         
         $controller = new $class();
         if (!is_callable([$controller, $method])) return $this->notFound();
@@ -309,7 +315,7 @@ class Router
     public static function fnmatch($pattern, $path)
     {
         $regex = preg_quote($pattern, '~');
-        $regex = strtr($regex, ['\?'=>'[^/]', '\*'=>'[^/]*', '\*\*'=>'.*', '#'=>'\d+', '\['=>'[', '\]'=>']', '\-'=>'-', '\{'=>'{', '\}'=>'}']);
+        $regex = strtr($regex, ['\?'=>'[^/]', '\*'=>'[^/]*', '/\*\*'=>'(?:/.+)?', '#'=>'\d+', '\['=>'[', '\]'=>']', '\-'=>'-', '\{'=>'{', '\}'=>'}']);
         $regex = preg_replace_callback('~{[^\}]+}~', function($part) { return '(' . substr(strtr($part[0], ',', '|'), 1, -1) . ')'; }, $regex);
         $regex = rawurldecode($regex);
 
@@ -317,13 +323,13 @@ class Router
     }
     
     /**
-     * Fill out the routes variables based on the url parts
+     * Fill out the routes variables based on the url parts.
      * 
-     * @param array $vars   Route variables
-     * @param array $parts  URL parts
+     * @param array|object $vars   Route variables
+     * @param array        $parts  URL parts
      * @return array
      */
-    protected static function bind(array $vars, array $parts)
+    protected static function bind($vars, array $parts)
     {
         $pos = 0;
         foreach ($vars as $key=>&$var) {
@@ -333,25 +339,30 @@ class Router
             }
             
             $options = explode('|', $var);
+            $var = null;
+            
             foreach ($options as $option) {
                 if ($option[0] === '$') {
                     $i = (int)substr($option, 1);
-                    if ($i > 0) $i++;
+                    if ($i > 0) $i--;
+
+                    $slice = array_slice($parts, $i);
                     
                     if (substr($option, -1, 1) != '+') {
-                        $var = array_slice($parts, $i)[0];
+                        if (!empty($slice)) $var = array_slice($parts, $i)[0];
                     } elseif (!is_array($vars) || is_string($key)) {
                         trigger_error("Binding multiple parts using \$+, like '$option', "
                             . "are only allow in (numeric) arrays", E_USER_WARING);
                         $var = null;
                     } else {
-                        $slice = array_slice($parts, $i);
                         array_splice($vars, $pos, 1, $slice);
                         $pos += count($slice) - 1;
                     }
                 } else {
                     $var = preg_replace('/^([\'"])(.*)\1$/', '$2', $option); // Unquote
                 }
+                
+                if (!empty($var)) break; // continues if option can't be used
             }
             
             $pos++;

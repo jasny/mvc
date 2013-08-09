@@ -59,7 +59,7 @@ abstract class View
         $class = get_called_class();
         
         $refl = new \ReflectionClass($class);
-        if ($refl->isAbstract()) $class = (self::$default[0] == '/' ? '' : __CLASS__ . '/') . ucfirst(self::$default);
+        if ($refl->isAbstract()) $class = (self::$default[0] == '\\' ? '' : __CLASS__ . '\\') . ucfirst(self::$default);
         
         return $class;
     }
