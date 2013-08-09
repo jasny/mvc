@@ -29,7 +29,7 @@ abstract class Controller
      */
     protected function redirect($url, $http_code = 303)
     {
-        return Router::redirect($url, $http_code);
+        return Router::i()->redirect($url, $http_code);
     }
 
     /**
@@ -39,7 +39,7 @@ abstract class Controller
      */
     protected function notFound($message=null)
     {
-        return Router::notFound($message);
+        return Router::i()->notFound($message);
     }
 
     /**
@@ -49,7 +49,7 @@ abstract class Controller
      */
     protected function badRequest($message)
     {
-        return Router::badRequest($message);
+        return Router::i()->badRequest($message);
     }
     
     

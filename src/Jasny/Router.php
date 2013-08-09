@@ -149,6 +149,16 @@ class Router
     
     
     /**
+     * Check if the router has been used.
+     * 
+     * @return boolean
+     */
+    public function isUsed()
+    {
+        return isset($this->route);
+    }
+    
+    /**
      * Find a matching route
      * 
      * @param string $url
@@ -190,6 +200,7 @@ class Router
         
         return $this->route;
     }
+    
     
     /**
      * Execute the action.

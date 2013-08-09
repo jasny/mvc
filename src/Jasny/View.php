@@ -3,13 +3,17 @@
 namespace Jasny;
 
 /**
- * View using Twig
+ * Base class for view loaders
  */
-class View
+abstract class View
 {
-    /** @var \Twig_Template */
-    protected $template;
-    
+    /**
+     * Class name default loader.
+     * Relative to namespace Jasny\View.
+     * 
+     * @var string
+     */
+    public static $default;
     
     /**
      * Cached flash message
@@ -17,19 +21,13 @@ class View
      */
     protected static $flash;
     
-    /** @var \Twig_Environment */
-    protected static $environment;
-    
     
     /**
      * Class constructor
      * 
      * @param string $name  Template filename
      */
-    public function __construct($name)
-    {
-        $this->template = self::getEnvironment()->loadTemplate($name);
-    }
+    abstract public function __construct($name);
 
     /**
      * Render the template
@@ -37,10 +35,7 @@ class View
      * @param array $context
      * @return string
      */
-    public function render($context)
-    {
-        $this->template->render($context);
-    }
+    abstract public function render($context);
     
     /**
      * Display the template
@@ -50,55 +45,24 @@ class View
      */
     public function display($context)
     {
-        $this->template->display($context);
+        echo $this->template->render($context);
     }
-    
+
     
     /**
-     * Init Twig environment
+     * Get the view loader class to use
      * 
-     * @param string $path  Path to the templates 
-     * @param string $path  The cache directory or false if cache is disabled.
+     * @return string
      */
-    public static function init($path, $cache=false)
+    protected final static function getClass()
     {
-        $loader = new \Twig_Loader_Filesystem($path);
-
-        $options = array();
-        // Set options like caching or debug http://twig.sensiolabs.org/doc/api.html#environment-options
+        $class = get_called_class();
         
-        $twig = new \Twig_Environment($loader, $options);
-        $twig->setCache($cache);
+        $refl = new \ReflectionClass($class);
+        if ($refl->isAbstract()) $class = (self::$default[0] == '/' ? '' : __CLASS__ . '/') . ucfirst(self::$default);
         
-        // Add filters and extensions http://twig.sensiolabs.org/doc/api.html#using-extensions
-        $twig->addFunction(new \Twig_SimpleFunction('flash', [__CLASS__, 'getFlash']));
-        $twig->addFilter(new \Twig_SimpleFilter('as_url', [__CLASS__, 'asUrl']));
-        $twig->addFilter(new \Twig_SimpleFilter('as_thumb', [__CLASS__, 'asThumb']));
-        
-        $twig->addExtension(new Jasny\Twig\DateExtension());
-        $twig->addExtension(new Jasny\Twig\PcreExtension());
-        $twig->addExtension(new Jasny\Twig\TextExtension());
-        $twig->addExtension(new Jasny\Twig\ArrayExtension());
-        
-        // Set globals http://twig.sensiolabs.org/doc/advanced.html#globals
-        $current_url = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
-        $twig->addGlobal('current_url', $current_url);
-        $twig->addGlobal('current_item', preg_replace('~/.*~', '', $current_url));
-        $twig->addGlobal('menu', self::getMenuItems());
-        
-        self::$environment = $twig;
-        return self::$environment;
+        return $class;
     }
-
-    /**
-     * Get Twig environment
-     */
-    public static function getEnvironment()
-    {
-        if (!isset(static::$environment)) static::init(getcwd() . '/views');
-        return static::$environment;
-    }
-
     
     /**
      * Load a view.
@@ -108,36 +72,22 @@ class View
      */
     public static function load($name)
     {
-        if (!pathinfo($name, PATHINFO_EXTENSION)) $name .= '.html.twig';
-        return new static($name);
+        $class = static::getClass();
+        return new $class($name);
     }
     
     /**
      * Check if a view exists.
+     * {@internal You *need* to overwrite this in child classes to prevent a dead loop}}
      * 
      * @param string $name  Template filename
      * @return boolean
      */
     public static function exists($name)
     {
-        if (!pathinfo($name, PATHINFO_EXTENSION)) $name .= '.html.twig';
-        return self::getEnvironment()->getLoader()->exists($name);
+        $class = static::getClass();
+        return call_user_func([$class, 'exists'], $name);
     }
-    
-    
-    /**
-     * Get menu items
-     * 
-     * @return array
-     */
-    protected static function getMenuItems()
-    {
-        $profiles = DB::conn()->fetchAll("SELECT reference, name, type FROM profile");
-        $events = DB::conn()->fetchAll("SELECT reference, name, 'event' AS type FROM event");
-        
-        return array_merge($profiles, $events);
-    }
-    
     
     /**
      * Use the flash message
@@ -152,33 +102,5 @@ class View
         }
         
         return self::$flash;
-    }
-    
-    /**
-     * Change upload path to upload url.
-     * 
-     * @param string $file
-     * @return string
-     */
-    public static function asUrl($file)
-    {
-        if (!isset($file)) return null;
-        
-        return substr_replace($file, 'http://usr.' . DOMAIN, 0, strlen(UPLOAD_PATH));
-    }
-    
-    /**
-     * Prefix image filename with thumb settings.
-     * 
-     * @param string $file
-     * @param string $size
-     * @return string
-     */
-    public static function asThumb($file, $size)
-    {
-        if (!isset($file)) return null;
-        
-        $file = dirname($file) . '/' . $size . '.'  . basename($file);
-        return self::asUrl($file);
     }
 }
