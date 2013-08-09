@@ -1,0 +1,27 @@
+{
+    "name": "jasny/mvc",
+    "description": "The basics for an MVC application",
+    "keywords": ["MVC"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Arnold Daniels",
+            "email": "arnold@jasny.net",
+            "homepage": "http://www.jasny.net"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/jasny/mvc/issues",
+        "source": "https://github.com/jasny/mvc"
+    },
+    "require": {
+        "php": ">=5.4.0"
+    },
+    "autoload": {
+        "psr-0": {
+            "Jasny\\Router": "src/",
+            "Jasny\\Controller": "src/",
+            "Jasny\\View": "src/"
+        }
+    }
+}
