@@ -27,7 +27,7 @@ class Router
 
     /**
      * Specific routes
-     * @var array 
+     * @var object 
      */
     protected $routes = [
         '/**' => ['controller' => '$1|default', 'action' => '$2|index', 'args' => ['$3+']],
@@ -68,7 +68,7 @@ class Router
      */
     public function setRoutes($routes)
     {
-        $this->routes = (array)$routes;
+        $this->routes = (object)$routes;
         $this->route = null;
 
         return $this;
@@ -81,6 +81,7 @@ class Router
      */
     public function getRoutes()
     {
+        if (!is_object($this->routes)) $this->routes = (object)$this->routes;
         return $this->routes;
     }
 
@@ -164,7 +165,7 @@ class Router
     {
         $url = rtrim($url, '/');
 
-        foreach (array_keys($this->routes) as $route) {
+        foreach (array_keys((array)$this->routes) as $route) {
             if (static::fnmatch(rtrim($route, '/'), $url)) return $route;
         }
 
@@ -188,7 +189,7 @@ class Router
         $match = $this->findRoute($url);
 
         if ($match) {
-            $this->route = static::bind((object)$this->routes[$match], static::splitUrl($url));
+            $this->route = static::bind((object)$this->routes->$match, static::splitUrl($url));
             $this->route->route = $match;
         } else {
             $this->route = false;
@@ -201,13 +202,21 @@ class Router
      * Execute the action of the given route.
      * 
      * @param object $route
-     * @return mixed  Whatever the controller returns
+     * @param object $overwrite
+     * @return boolean|mixed  Whatever the controller returns or true on success
      */
-    protected function routeTo($route)
+    protected function routeTo($route, $overwrite=[])
     {
-        // No route
-        if (!$route) return $this->notFound();
+        if (!is_object($route)) {
+            $key = $this->findRoute($route);
+            if (!isset($key) || !isset($this->routes->$key)) return false;
+            $route = $this->routes->$key;
+        }
 
+        foreach ($overwrite as $key=>$value) {
+            $route->$key = $value;
+        }
+        
         // Route to file
         if (isset($route->file)) {
             $file = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . ltrim(static::rebase($route->file), '/');
@@ -215,7 +224,7 @@ class Router
             if (!file_exists($file)) {
                 trigger_error("Failed to route using '{$route->route}': File '$file' doesn't exist."
                         , E_USER_WARNING);
-                return $this->notFound();
+                return false;
             }
 
             return include $file;
@@ -225,7 +234,7 @@ class Router
         if (empty($route->controller) || empty($route->action)) {
             trigger_error("Failed to route using '{$route->route}': "
                     . (empty($route->controller) ? 'Controller' : 'Action') . " is not set", E_USER_WARNING);
-            return $this->notFound();
+            return false;
         }
 
         $class = ucfirst($route->controller) . 'Controller';
@@ -237,7 +246,8 @@ class Router
         $controller = new $class();
         if (!is_callable([$controller, $method])) return $this->notFound();
 
-        return call_user_func_array([$controller, $method], $args);
+        $ret = call_user_func_array([$controller, $method], $args);
+        return isset($ret) ? $ret : true;
     }
 
     /**
@@ -248,7 +258,10 @@ class Router
     public function execute()
     {
         $route = $this->getRoute();
-        return $this->routeTo($route);
+        if ($route) $ret = $this->routeTo($route);
+        
+        if (!isset($ret) || $ret === false) return $this->notFound();
+        return $ret;
     }
 
     
@@ -280,7 +293,7 @@ class Router
      * @param string $url 
      * @param int    $http_code  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
      */
-    public function redirect($url, $http_code = 303)
+    public function redirect($url, $http_code=303)
     {
         // Turn relative URL into absolute URL
         if (strpos($url, '://') === false) {
@@ -290,10 +303,9 @@ class Router
 
         header("Location: $url", true, $http_code);
         
-        $route = $this->findRoute($http_code);
-        if ($route) return $this->routeTo($route);
-
-        echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
+        if (!$this->routeTo($http_code, ['args'=>[$url, $http_code]])) {
+            echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
+        }
     }
 
     /**
@@ -306,11 +318,7 @@ class Router
         if (ob_get_level() > 1) ob_end_clean();
 
         header('HTTP/1.0 400 Bad Request');
-        
-        $route = $this->findRoute(400);
-        if ($route) return $this->routeTo($route);
-        
-        echo $message;
+        if (!$this->routeTo(400, ['args'=>[400, $message]])) echo $message;
     }
 
     /**
@@ -318,16 +326,14 @@ class Router
      * 
      * @param string $message
      */
-    public function notFound($message = null)
+    public function notFound($message=null)
     {
         if (ob_get_level() > 1) ob_end_clean();
 
-        header('HTTP/1.0 404 Not Found');
+        if (!isset($message)) $message = "Sorry, this page does not exist";
         
-        $route = $this->findRoute(404);
-        if ($route) return $this->routeTo($route);
-
-        echo $message ?: "Sorry, this page does not exist";
+        header('HTTP/1.0 404 Not Found');
+        if (!$this->routeTo(404, ['args'=>[404, $message]])) echo $message;
     }
 
     /**
@@ -340,11 +346,7 @@ class Router
         if (ob_get_level() > 1) ob_end_clean();
 
         header('HTTP/1.0 500 Internal Server Error');
-        
-        $route = $this->findRoute(500);
-        if ($route) return $this->routeTo($route);
-        
-        return false;
+        return (boolean)$this->routeTo(500, ['args'=>[500]]);
     }
     
     
