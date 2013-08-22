@@ -18,40 +18,39 @@ namespace Jasny;
  */
 class Router
 {
+
     /**
      * The default instance
      * @var Router
      */
     protected static $instance;
 
-
     /**
      * Specific routes
      * @var array 
      */
     protected $routes = [
-        '/**' => ['controller'=>'%1|default', 'action'=>'%2|index', 'args'=>['%3+']],
+        '/**' => ['controller' => '$1|default', 'action' => '$2|index', 'args' => ['$3+']],
     ];
-    
+
     /**
      * Webroot subdir from DOCUMENT_ROOT.
      * @var string
      */
     protected $base;
-    
+
     /**
      * URL to route
      * @var string 
      */
     protected $url;
-    
+
     /**
      * Variables from matched route (cached)
      * @var object 
      */
     protected $route;
-    
-    
+
     /**
      * Get the default router
      */
@@ -60,8 +59,7 @@ class Router
         if (!isset(self::$instance)) self::$instance = new static();
         return self::$instance;
     }
-    
-    
+
     /**
      * Set the routes
      * 
@@ -72,7 +70,7 @@ class Router
     {
         $this->routes = (array)$routes;
         $this->route = null;
-        
+
         return $this;
     }
 
@@ -85,8 +83,7 @@ class Router
     {
         return $this->routes;
     }
-    
-    
+
     /**
      * Set the webroot subdir from DOCUMENT_ROOT.
      * 
@@ -97,10 +94,10 @@ class Router
     {
         $this->base = $dir;
         $this->route = null;
-        
+
         return $this;
     }
-    
+
     /**
      * Get the webroot subdir from DOCUMENT_ROOT.
      * 
@@ -110,7 +107,7 @@ class Router
     {
         return $this->base;
     }
-    
+
     /**
      * Add a base path to the URL if the webroot isn't the same as the webservers document root
      * 
@@ -121,8 +118,7 @@ class Router
     {
         return (isset($this->base) ? rtrim($this->base, '/') . '/' : '') . $url;
     }
-    
-    
+
     /**
      * Set the URL to route
      * 
@@ -133,10 +129,10 @@ class Router
     {
         $this->url = $url;
         $this->route = null;
-        
+
         return $this;
     }
-    
+
     /**
      * Get the URL to route
      * 
@@ -147,8 +143,7 @@ class Router
         if (!isset($this->url)) $this->url = $_SERVER['REQUEST_URI'];
         return $this->url;
     }
-    
-    
+
     /**
      * Check if the router has been used.
      * 
@@ -158,7 +153,7 @@ class Router
     {
         return isset($this->route);
     }
-    
+
     /**
      * Find a matching route
      * 
@@ -168,14 +163,14 @@ class Router
     protected function findRoute($url)
     {
         $url = rtrim($url, '/');
-        
+
         foreach (array_keys($this->routes) as $route) {
             if (static::fnmatch(rtrim($route, '/'), $url)) return $route;
         }
-        
+
         return false;
     }
-    
+
     /**
      * Get a matching route.
      * 
@@ -184,25 +179,67 @@ class Router
     public function getRoute()
     {
         if (isset($this->route)) return $this->route;
-        
+
         $url = $this->getUrl();
         if ($this->base) {
             $url = '/' . preg_replace('~^' . preg_quote(trim($this->base, '/'), '~') . '~', '', ltrim($url, '/'));
         }
-        
+
         $match = $this->findRoute($url);
-        
+
         if ($match) {
             $this->route = static::bind((object)$this->routes[$match], static::splitUrl($url));
             $this->route->route = $match;
         } else {
             $this->route = false;
         }
-        
+
         return $this->route;
     }
-    
-    
+
+    /**
+     * Execute the action of the given route.
+     * 
+     * @param object $route
+     * @return mixed  Whatever the controller returns
+     */
+    protected function routeTo($route)
+    {
+        // No route
+        if (!$route) return $this->notFound();
+
+        // Route to file
+        if (isset($route->file)) {
+            $file = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . ltrim(static::rebase($route->file), '/');
+
+            if (!file_exists($file)) {
+                trigger_error("Failed to route using '{$route->route}': File '$file' doesn't exist."
+                        , E_USER_WARNING);
+                return $this->notFound();
+            }
+
+            return include $file;
+        }
+
+        // Route to controller
+        if (empty($route->controller) || empty($route->action)) {
+            trigger_error("Failed to route using '{$route->route}': "
+                    . (empty($route->controller) ? 'Controller' : 'Action') . " is not set", E_USER_WARNING);
+            return $this->notFound();
+        }
+
+        $class = ucfirst($route->controller) . 'Controller';
+        $method = $route->action . 'Action';
+        $args = isset($route->args) ? $route->args : [];
+
+        if (!class_exists($class)) return $this->notFound();
+
+        $controller = new $class();
+        if (!is_callable([$controller, $method])) return $this->notFound();
+
+        return call_user_func_array([$controller, $method], $args);
+    }
+
     /**
      * Execute the action.
      * 
@@ -211,40 +248,29 @@ class Router
     public function execute()
     {
         $route = $this->getRoute();
-        
-        // No route
-        if (!$route) return $this->notFound();
-        
-        // Route to file
-        if (isset($route->file)) {
-            $file = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . ltrim(static::rebase($route->file), '/');
-            
-            if (!file_exists($file)) {
-                trigger_error("Failed to route using '{$route->route}': File '$file' doesn't exist."
-                    , E_USER_WARNING);
-                return $this->notFound();
-            }
-            
-            return include $file; 
-        }
-        
-        // Route to controller
-        if (empty($route->controller) || empty($route->action)) {
-            trigger_error("Failed to route using '{$route->route}': "
-                . (empty($route->controller) ? 'Controller' : 'Action') . " is not set", E_USER_WARNING);
-            return $this->notFound();
-        }
-        
-        $class = ucfirst($route->controller) . 'Controller';
-        $method = $route->action . 'Action';
-        $args = isset($route->args) ? $route->args : [];
- 
-        if (!class_exists($class)) return $this->notFound();
-        
-        $controller = new $class();
-        if (!is_callable([$controller, $method])) return $this->notFound();
-        
-        return call_user_func_array([$controller, $method], $args);
+        return $this->routeTo($route);
+    }
+
+    
+    /**
+     * Enable router to handle fatal errors.
+     */
+    public function handleErrors()
+    {
+        set_error_handler(array($this, 'onError'), E_RECOVERABLE_ERROR | E_USER_ERROR);
+        set_exception_handler(array($this, 'error'));
+    }
+    
+    /**
+     * Error handler callback
+     * 
+     * @param int $errno
+     * @return boolean
+     */
+    private function onError($errno)
+    {
+        if (!(error_reporting() & $errno)) return;
+        return $this->error();
     }
     
     
@@ -263,22 +289,13 @@ class Router
         }
 
         header("Location: $url", true, $http_code);
+        
+        $route = $this->findRoute($http_code);
+        if ($route) return $this->routeTo($route);
+
         echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
     }
 
-    /**
-     * Give a 404 Not Found response
-     * 
-     * @param string $message
-     */
-    public function notFound($message=null)
-    {
-       if (ob_get_level() > 1) ob_end_clean();
-       
-       header('HTTP/1.0 404 Not Found');
-       echo $message ?: "Sorry, this page does not exist"; 
-    }
-    
     /**
      * Give a 400 Bad Request response
      * 
@@ -286,10 +303,48 @@ class Router
      */
     public function badRequest($message)
     {
-       if (ob_get_level() > 1) ob_end_clean();
-       
-       header('HTTP/1.0 400 Bad Request');
-       echo $message;
+        if (ob_get_level() > 1) ob_end_clean();
+
+        header('HTTP/1.0 400 Bad Request');
+        
+        $route = $this->findRoute(400);
+        if ($route) return $this->routeTo($route);
+        
+        echo $message;
+    }
+
+    /**
+     * Give a 404 Not Found response
+     * 
+     * @param string $message
+     */
+    public function notFound($message = null)
+    {
+        if (ob_get_level() > 1) ob_end_clean();
+
+        header('HTTP/1.0 404 Not Found');
+        
+        $route = $this->findRoute(404);
+        if ($route) return $this->routeTo($route);
+
+        echo $message ?: "Sorry, this page does not exist";
+    }
+
+    /**
+     * Give a 500 Internal Server Error response
+     * 
+     * @param string $message
+     */
+    public function error()
+    {
+        if (ob_get_level() > 1) ob_end_clean();
+
+        header('HTTP/1.0 500 Internal Server Error');
+        
+        $route = $this->findRoute(500);
+        if ($route) return $this->routeTo($route);
+        
+        return false;
     }
     
     
@@ -304,7 +359,7 @@ class Router
         $url = parse_url(trim($url, '/'), PHP_URL_PATH);
         return $url ? explode('/', $url) : array();
     }
-    
+
     /**
      * Match path against wildcard pattern.
      * 
@@ -315,13 +370,16 @@ class Router
     public static function fnmatch($pattern, $path)
     {
         $regex = preg_quote($pattern, '~');
-        $regex = strtr($regex, ['\?'=>'[^/]', '\*'=>'[^/]*', '/\*\*'=>'(?:/.+)?', '#'=>'\d+', '\['=>'[', '\]'=>']', '\-'=>'-', '\{'=>'{', '\}'=>'}']);
-        $regex = preg_replace_callback('~{[^\}]+}~', function($part) { return '(' . substr(strtr($part[0], ',', '|'), 1, -1) . ')'; }, $regex);
+        $regex = strtr($regex, ['\?' => '[^/]', '\*' => '[^/]*', '/\*\*' => '(?:/.+)?', '#' => '\d+', '\[' => '[',
+            '\]' => ']', '\-' => '-', '\{' => '{', '\}' => '}']);
+        $regex = preg_replace_callback('~{[^\}]+}~', function($part) {
+                return '(' . substr(strtr($part[0], ',', '|'), 1, -1) . ')';
+            }, $regex);
         $regex = rawurldecode($regex);
 
         return (boolean)preg_match("~^{$regex}$~", $path);
     }
-    
+
     /**
      * Fill out the routes variables based on the url parts.
      * 
@@ -332,27 +390,27 @@ class Router
     protected static function bind($vars, array $parts)
     {
         $pos = 0;
-        foreach ($vars as $key=>&$var) {
+        foreach ($vars as $key => &$var) {
             if (!is_scalar($var)) {
                 $var = static::bind($var, $parts);
                 continue;
             }
-            
+
             $options = explode('|', $var);
             $var = null;
-            
+
             foreach ($options as $option) {
                 if ($option[0] === '$') {
                     $i = (int)substr($option, 1);
                     if ($i > 0) $i--;
 
                     $slice = array_slice($parts, $i);
-                    
+
                     if (substr($option, -1, 1) != '+') {
                         if (!empty($slice)) $var = array_slice($parts, $i)[0];
                     } elseif (!is_array($vars) || is_string($key)) {
                         trigger_error("Binding multiple parts using \$+, like '$option', "
-                            . "are only allow in (numeric) arrays", E_USER_WARING);
+                                . "are only allow in (numeric) arrays", E_USER_WARING);
                         $var = null;
                     } else {
                         array_splice($vars, $pos, 1, $slice);
@@ -361,13 +419,14 @@ class Router
                 } else {
                     $var = preg_replace('/^([\'"])(.*)\1$/', '$2', $option); // Unquote
                 }
-                
+
                 if (!empty($var)) break; // continues if option can't be used
             }
-            
+
             $pos++;
         }
-        
+
         return $vars;
     }
+
 }
