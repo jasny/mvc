@@ -51,6 +51,7 @@ class Router
      */
     protected $route;
 
+    
     /**
      * Get the default router
      */
@@ -60,6 +61,7 @@ class Router
         return self::$instance;
     }
 
+    
     /**
      * Set the routes
      * 
@@ -85,6 +87,7 @@ class Router
         return $this->routes;
     }
 
+    
     /**
      * Set the webroot subdir from DOCUMENT_ROOT.
      * 
@@ -145,6 +148,7 @@ class Router
         return $this->url;
     }
 
+    
     /**
      * Check if the router has been used.
      * 
@@ -163,10 +167,11 @@ class Router
      */
     protected function findRoute($url)
     {
-        $url = rtrim($url, '/');
+        if ($url !== '/') $url = rtrim($url, '/');
 
         foreach (array_keys((array)$this->routes) as $route) {
-            if (static::fnmatch(rtrim($route, '/'), $url)) return $route;
+            if ($route !== '/') $route = rtrim($route, '/');
+            if (static::fnmatch($route, $url)) return $route;
         }
 
         return false;
@@ -198,6 +203,19 @@ class Router
         return $this->route;
     }
 
+    /**
+     * Get a parameter of the matching route.
+     * 
+     * @param string $name   Parameter name
+     * @return mixed
+     */
+    public function get($name)
+    {
+        $route = $this->getRoute();
+        return @$route->$name;
+    }
+    
+    
     /**
      * Execute the action of the given route.
      * 
@@ -277,18 +295,34 @@ class Router
     /**
      * Error handler callback
      * 
-     * @param int $errno
+     * @param int    $errno
+     * @param string $errstr
+     * @param string $errfile
+     * @param int    $errline
+     * @param array  $errcontext
      * @return boolean
      */
-    private function onError($errno)
+    private function onError($errno, $errstr, $errfile, $errline, $errcontext)
     {
-        if (!(error_reporting() & $errno)) return;
-        return $this->error();
+        if (!(error_reporting() & $errno)) return null;
+        
+        $args = func_get_args();
+        return $this->error($args);
     }
     
+
+    /**
+     * Get the HTTP protocol
+     * 
+     * @return string;
+     */
+    protected function getProtocol()
+    {
+        return @$_SERVER['SERVER_PROTOCOL'] ?: 'HTTP/1.1';
+    }
     
     /**
-     * Redirect to another page.
+     * Redirect to another page and exit
      * 
      * @param string $url 
      * @param int    $http_code  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
@@ -306,10 +340,11 @@ class Router
         if (!$this->routeTo($http_code, ['args'=>[$url, $http_code]])) {
             echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
         }
+        exit();
     }
 
     /**
-     * Give a 400 Bad Request response
+     * Give a 400 Bad Request response and exit
      * 
      * @param string $message
      */
@@ -317,12 +352,13 @@ class Router
     {
         if (ob_get_level() > 1) ob_end_clean();
 
-        header('HTTP/1.0 400 Bad Request');
+        header($this->getProtocol() . ' 400 Bad Request');
         if (!$this->routeTo(400, ['args'=>[400, $message]])) echo $message;
+        exit();
     }
 
     /**
-     * Give a 404 Not Found response
+     * Give a 404 Not Found response and exit
      * 
      * @param string $message
      */
@@ -332,21 +368,23 @@ class Router
 
         if (!isset($message)) $message = "Sorry, this page does not exist";
         
-        header('HTTP/1.0 404 Not Found');
+        header($this->getProtocol() . ' 404 Not Found');
         if (!$this->routeTo(404, ['args'=>[404, $message]])) echo $message;
+        exit();
     }
 
     /**
      * Give a 500 Internal Server Error response
      * 
-     * @param string $message
+     * @param array|\Exception $error
+     * @return boolean
      */
-    public function error()
+    public function error($error)
     {
         if (ob_get_level() > 1) ob_end_clean();
 
-        header('HTTP/1.0 500 Internal Server Error');
-        return (boolean)$this->routeTo(500, ['args'=>[500]]);
+        header($this->getProtocol() . ' 500 Internal Server Error');
+        return (boolean)$this->routeTo(500, ['args'=>[500, $error]]);
     }
     
     
@@ -430,5 +468,4 @@ class Router
 
         return $vars;
     }
-
 }
