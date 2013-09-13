@@ -306,7 +306,7 @@ class Router
     {
         if (!(error_reporting() & $errno)) return null;
         
-        $args = func_get_args();
+        $args = get_defined_vars();
         return $this->error($args);
     }
     
@@ -410,7 +410,7 @@ class Router
     public static function fnmatch($pattern, $path)
     {
         $regex = preg_quote($pattern, '~');
-        $regex = strtr($regex, ['\?' => '[^/]', '\*' => '[^/]*', '/\*\*' => '(?:/.+)?', '#' => '\d+', '\[' => '[',
+        $regex = strtr($regex, ['\?' => '[^/]', '\*' => '[^/]*', '/\*\*' => '(?:/.*)?', '#' => '\d+', '\[' => '[',
             '\]' => ']', '\-' => '-', '\{' => '{', '\}' => '}']);
         $regex = preg_replace_callback('~{[^\}]+}~', function($part) {
                 return '(' . substr(strtr($part[0], ',', '|'), 1, -1) . ')';
