@@ -164,6 +164,8 @@ class Router
      */
     protected static function findRoute($url)
     {
+        static::getRoutes(); // Make sure the routes are initialised
+        
         if ($url !== '/') $url = rtrim($url, '/');
 
         foreach (array_keys((array)static::$routes) as $route) {
@@ -223,9 +225,9 @@ class Router
     protected static function routeTo($route, $overwrite=[])
     {
         if (!is_object($route)) {
-            $key = static::findRoute($route);
-            if (!isset($key) || !isset(static::$routes->$key)) return false;
-            $route = static::$routes->$key;
+            $match = static::findRoute($route);
+            if (!isset($match) || !isset(static::$routes->$match)) return false;
+            $route = static::$routes->$match;
         }
 
         foreach ($overwrite as $key=>$value) {
