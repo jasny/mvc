@@ -94,7 +94,7 @@ class Router
      */
     public static function setBase($dir)
     {
-        static::$base = $dir;
+        static::$base = rtrim($dir, '/');
         static::$route = null;
 
         return $this;
@@ -118,7 +118,7 @@ class Router
      */
     public static function rebase($url)
     {
-        return (isset(static::$base) ? rtrim(static::$base, '/') . '/' : '') . $url;
+        return (static::getBase() ?: '/') . ltrim($url, '/');
     }
 
     /**
@@ -184,8 +184,8 @@ class Router
         if (isset(static::$route)) return static::$route;
 
         $url = static::getUrl();
-        if (static::$base) {
-            $url = '/' . preg_replace('~^' . preg_quote(trim(static::$base, '/'), '~') . '~', '', ltrim($url, '/'));
+        if (static::getBase()) {
+            $url = '/' . preg_replace('~^' . preg_quote(trim(static::getBase(), '/'), '~') . '~', '', ltrim($url, '/'));
         }
 
         $match = static::findRoute($url);
