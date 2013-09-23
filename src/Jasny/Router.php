@@ -254,8 +254,8 @@ class Router
             return false;
         }
 
-        $class = ucfirst($route->controller) . 'Controller';
-        $method = $route->action . 'Action';
+        $class = static::camelcase($route->controller) . 'Controller';
+        $method = lcfirst(static::camelcase($route->action)) . 'Action';
         $args = isset($route->args) ? $route->args : [];
 
         if (!class_exists($class)) return static::notFound();
@@ -466,5 +466,16 @@ class Router
         }
 
         return $vars;
+    }
+
+    /**
+     * CamelCase a word
+     * 
+     * @param string $string
+     * @return string
+     */
+    protected static function camelcase($string)
+    {
+        return strtr(ucwords(strtr($string, '_-', '  ')), [' '=>'']);
     }
 }

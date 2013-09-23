@@ -83,7 +83,7 @@ class Twig extends \Jasny\View
         
         // Set globals http://twig.sensiolabs.org/doc/advanced.html#globals
         $twig->addGlobal('current_url', rtrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/'));
-        if (Router::i()->isUsed()) $twig->addGlobal('current_route', Router::i()->getRoute());
+        if (Router::isUsed()) $twig->addGlobal('current_route', Router::getRoute());
         
         self::$environment = $twig;
         return self::$environment;
