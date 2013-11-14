@@ -141,7 +141,7 @@ class Router
      */
     public static function getUrl()
     {
-        if (!isset(static::$url)) static::$url = $_SERVER['REQUEST_URI'];
+        if (!isset(static::$url)) static::$url = preg_replace('/\?.*$/', '', $_SERVER['REQUEST_URI']);
         return static::$url;
     }
 
