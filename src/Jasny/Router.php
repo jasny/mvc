@@ -18,72 +18,67 @@ namespace Jasny;
  */
 class Router
 {
-
-    /**
-     * The default instance
-     * @var Router
-     */
-    protected static $instance;
-
     /**
      * Specific routes
-     * @var object 
+     * @var array 
      */
-    protected static $routes = [
-        '/**' => ['controller' => '$1|default', 'action' => '$2|index', 'args' => ['$3+']],
-    ];
+    protected $routes;
 
     /**
      * Webroot subdir from DOCUMENT_ROOT.
      * @var string
      */
-    protected static $base;
+    protected $base;
 
     /**
      * URL to route
      * @var string 
      */
-    protected static $url;
+    protected $url;
 
     /**
      * Variables from matched route (cached)
      * @var object 
      */
-    protected static $route;
+    protected $route;
 
     
     /**
-     * Get the default router
+     * Class constructor
      * 
-     * @deprecated
+     * @param array $routes  Array with route objects
      */
-    public static function i()
+    public function __construct($routes=null)
     {
-        if (!isset(self::$instance)) self::$instance = new static();
-        return self::$instance;
+        if (isset($routes)) $this->setRoutes($routes);
     }
-
     
     /**
      * Set the routes
      * 
-     * @param array $routes
+     * @param array $routes  Array with route objects
+     * @return Router
      */
-    public static function setRoutes($routes)
+    public function setRoutes($routes)
     {
-        static::$routes = (object)$routes;
-        static::$route = null;
+        $this->routes = (array)$routes;
+        $this->route = null;
+        
+        return $this;
     }
 
     /**
      * Get a list of all routes
      * 
-     * @return array
+     * @return object
      */
-    public static function getRoutes()
+    public function getRoutes()
     {
-        if (!is_object(static::$routes)) static::$routes = (object)static::$routes;
-        return static::$routes;
+        if (!isset($this->routes)) $this->setRoutes([
+            '/**' => (object)['controller' => '$1|default', 'action' => '$2|index', 'args' => ['$3+']]
+        ]);
+        
+        return $this->routes;
     }
 
     
@@ -91,11 +86,12 @@ class Router
      * Set the webroot subdir from DOCUMENT_ROOT.
      * 
      * @param string $dir
+     * @return Router
      */
-    public static function setBase($dir)
+    public function setBase($dir)
     {
-        static::$base = rtrim($dir, '/');
-        static::$route = null;
+        $this->base = rtrim($dir, '/');
+        $this->route = null;
 
         return $this;
     }
@@ -105,9 +101,9 @@ class Router
      * 
      * @return string
      */
-    public static function getBase()
+    public function getBase()
     {
-        return static::$base;
+        return $this->base;
     }
 
     /**
@@ -116,20 +112,21 @@ class Router
      * @param string $url
      * @return string
      */
-    public static function rebase($url)
+    public function rebase($url)
     {
-        return (static::getBase() ?: '/') . ltrim($url, '/');
+        return ($this->getBase() ?: '/') . ltrim($url, '/');
     }
 
     /**
      * Set the URL to route
      * 
      * @param string $url
+     * @return Router
      */
-    public static function setUrl($url)
+    public function setUrl($url)
     {
-        static::$url = $url;
-        static::$route = null;
+        $this->url = $url;
+        $this->route = null;
 
         return $this;
     }
@@ -139,10 +136,10 @@ class Router
      * 
      * @return string
      */
-    public static function getUrl()
+    public function getUrl()
     {
-        if (!isset(static::$url)) static::$url = preg_replace('/\?.*$/', '', $_SERVER['REQUEST_URI']);
-        return static::$url;
+        if (!isset($this->url)) $this->url = preg_replace('/\?.*$/', '', $_SERVER['REQUEST_URI']);
+        return $this->url;
     }
 
     
@@ -151,9 +148,9 @@ class Router
      * 
      * @return boolean
      */
-    public static function isUsed()
+    public function isUsed()
     {
-        return isset(static::$route);
+        return isset($this->route);
     }
 
     /**
@@ -162,15 +159,15 @@ class Router
      * @param string $url
      * @return string
      */
-    protected static function findRoute($url)
+    protected function findRoute($url)
     {
-        static::getRoutes(); // Make sure the routes are initialised
+        $this->getRoutes(); // Make sure the routes are initialised
         
         if ($url !== '/') $url = rtrim($url, '/');
 
-        foreach (array_keys((array)static::$routes) as $route) {
+        foreach (array_keys($this->routes) as $route) {
             if ($route !== '/') $route = rtrim($route, '/');
-            if (static::fnmatch($route, $url)) return $route;
+            if ($this->fnmatch($route, $url)) return $route;
         }
 
         return false;
@@ -181,25 +178,25 @@ class Router
      * 
      * @return object
      */
-    public static function getRoute()
+    public function getRoute()
     {
-        if (isset(static::$route)) return static::$route;
+        if (isset($this->route)) return $this->route;
 
-        $url = static::getUrl();
-        if (static::getBase()) {
-            $url = '/' . preg_replace('~^' . preg_quote(trim(static::getBase(), '/'), '~') . '~', '', ltrim($url, '/'));
+        $url = $this->getUrl();
+        if ($this->getBase()) {
+            $url = '/' . preg_replace('~^' . preg_quote(trim($this->getBase(), '/'), '~') . '~', '', ltrim($url, '/'));
         }
 
-        $match = static::findRoute($url);
+        $match = $this->findRoute($url);
 
         if ($match) {
-            static::$route = static::bind((object)static::$routes->$match, static::splitUrl($url));
-            static::$route->route = $match;
+            $this->route = $this->bind($this->routes[$match], $this->splitUrl($url));
+            $this->route->route = $match;
         } else {
-            static::$route = false;
+            $this->route = false;
         }
 
-        return static::$route;
+        return $this->route;
     }
 
     /**
@@ -208,9 +205,9 @@ class Router
      * @param string $name   Parameter name
      * @return mixed
      */
-    public static function get($name)
+    public function get($name)
     {
-        $route = static::getRoute();
+        $route = $this->getRoute();
         return @$route->$name;
     }
     
@@ -222,12 +219,12 @@ class Router
      * @param object $overwrite
      * @return boolean|mixed  Whatever the controller returns or true on success
      */
-    protected static function routeTo($route, $overwrite=[])
+    protected function routeTo($route, $overwrite=[])
     {
         if (!is_object($route)) {
-            $match = static::findRoute($route);
-            if (!isset($match) || !isset(static::$routes->$match)) return false;
-            $route = static::$routes->$match;
+            $match = $this->findRoute($route);
+            if (!isset($match) || !isset($this->routes[$match])) return false;
+            $route = $this->routes[$match];
         }
 
         foreach ($overwrite as $key=>$value) {
@@ -236,7 +233,7 @@ class Router
         
         // Route to file
         if (isset($route->file)) {
-            $file = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . ltrim(static::rebase($route->file), '/');
+            $file = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . ltrim($this->rebase($route->file), '/');
 
             if (!file_exists($file)) {
                 trigger_error("Failed to route using '{$route->route}': File '$file' doesn't exist."
@@ -254,14 +251,14 @@ class Router
             return false;
         }
 
-        $class = static::camelcase($route->controller) . 'Controller';
-        $method = lcfirst(static::camelcase($route->action)) . 'Action';
+        $class = $this->camelcase($route->controller) . 'Controller';
+        $method = lcfirst($this->camelcase($route->action)) . 'Action';
         $args = isset($route->args) ? $route->args : [];
 
-        if (!class_exists($class)) return static::notFound();
+        if (!class_exists($class)) return $this->notFound();
 
         $controller = new $class();
-        if (!is_callable([$controller, $method])) return static::notFound();
+        if (!is_callable([$controller, $method])) return $this->notFound();
 
         $ret = call_user_func_array([$controller, $method], $args);
         return isset($ret) ? $ret : true;
@@ -272,12 +269,12 @@ class Router
      * 
      * @return mixed  Whatever the controller returns
      */
-    public static function execute()
+    public function execute()
     {
-        $route = static::getRoute();
-        if ($route) $ret = static::routeTo($route);
+        $route = $this->getRoute();
+        if ($route) $ret = $this->routeTo($route);
         
-        if (!isset($ret) || $ret === false) return static::notFound();
+        if (!isset($ret) || $ret === false) return $this->notFound();
         return $ret;
     }
 
@@ -285,7 +282,7 @@ class Router
     /**
      * Enable router to handle fatal errors.
      */
-    public static function handleErrors()
+    public function handleErrors()
     {
         set_error_handler(array(get_called_class(), 'onError'), E_RECOVERABLE_ERROR | E_USER_ERROR);
         set_exception_handler(array(get_called_class(), 'error'));
@@ -301,12 +298,12 @@ class Router
      * @param array  $errcontext
      * @return boolean
      */
-    private static function onError($errno, $errstr, $errfile, $errline, $errcontext)
+    protected function onError($errno, $errstr, $errfile, $errline, $errcontext)
     {
         if (!(error_reporting() & $errno)) return null;
         
         $args = get_defined_vars();
-        return static::error($args);
+        return $this->error($args);
     }
     
 
@@ -315,7 +312,7 @@ class Router
      * 
      * @return string;
      */
-    protected static function getProtocol()
+    protected function getProtocol()
     {
         return @$_SERVER['SERVER_PROTOCOL'] ?: 'HTTP/1.1';
     }
@@ -326,17 +323,17 @@ class Router
      * @param string $url 
      * @param int    $http_code  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
      */
-    public static function redirect($url, $http_code=303)
+    public function redirect($url, $http_code=303)
     {
         // Turn relative URL into absolute URL
         if (strpos($url, '://') === false) {
             if ($url == '' || $url[0] != '/') $url = dirname($_SERVER['REQUEST_URI']) . '/' . $url;
-            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . static::rebase($url);
+            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . $this->rebase($url);
         }
 
         header("Location: $url", true, $http_code);
         
-        if (!static::routeTo($http_code, ['args'=>[$url, $http_code]])) {
+        if (!$this->routeTo($http_code, ['args'=>[$url, $http_code]])) {
             echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
         }
         exit();
@@ -347,12 +344,12 @@ class Router
      * 
      * @param string $message
      */
-    public static function badRequest($message)
+    public function badRequest($message)
     {
         if (ob_get_level() > 1) ob_end_clean();
 
-        header(static::getProtocol() . ' 400 Bad Request');
-        if (!static::routeTo(400, ['args'=>[400, $message]])) echo $message;
+        header($this->getProtocol() . ' 400 Bad Request');
+        if (!$this->routeTo(400, ['args'=>[400, $message]])) echo $message;
         exit();
     }
 
@@ -361,14 +358,14 @@ class Router
      * 
      * @param string $message
      */
-    public static function notFound($message=null)
+    public function notFound($message=null)
     {
         if (ob_get_level() > 1) ob_end_clean();
 
         if (!isset($message)) $message = "Sorry, this page does not exist";
         
-        header(static::getProtocol() . ' 404 Not Found');
-        if (!static::routeTo(404, ['args'=>[404, $message]])) echo $message;
+        header($this->getProtocol() . ' 404 Not Found');
+        if (!$this->routeTo(404, ['args'=>[404, $message]])) echo $message;
         exit();
     }
 
@@ -378,12 +375,12 @@ class Router
      * @param array|\Exception $error
      * @return boolean
      */
-    public static function error($error)
+    public function error($error)
     {
         if (ob_get_level() > 1) ob_end_clean();
 
-        header(static::getProtocol() . ' 500 Internal Server Error');
-        return (boolean)static::routeTo(500, ['args'=>[500, $error]]);
+        header($this->getProtocol() . ' 500 Internal Server Error');
+        return (boolean)$this->routeTo(500, ['args'=>[500, $error]]);
     }
     
     
@@ -393,7 +390,7 @@ class Router
      * @param string $url
      * @return array
      */
-    public static function splitUrl($url)
+    public function splitUrl($url)
     {
         $url = parse_url(trim($url, '/'), PHP_URL_PATH);
         return $url ? explode('/', $url) : array();
@@ -406,7 +403,7 @@ class Router
      * @param string $path
      * @return boolean
      */
-    public static function fnmatch($pattern, $path)
+    public function fnmatch($pattern, $path)
     {
         $regex = preg_quote($pattern, '~');
         $regex = strtr($regex, ['\?' => '[^/]', '\*' => '[^/]*', '/\*\*' => '(?:/.*)?', '#' => '\d+', '\[' => '[',
@@ -426,12 +423,12 @@ class Router
      * @param array        $parts  URL parts
      * @return array
      */
-    protected static function bind($vars, array $parts)
+    protected function bind($vars, array $parts)
     {
         $pos = 0;
         foreach ($vars as $key => &$var) {
             if (!is_scalar($var)) {
-                $var = static::bind($var, $parts);
+                $var = $this->bind($var, $parts);
                 continue;
             }
 
@@ -474,7 +471,7 @@ class Router
      * @param string $string
      * @return string
      */
-    protected static function camelcase($string)
+    protected function camelcase($string)
     {
         return strtr(ucwords(strtr($string, '_-', '  ')), [' '=>'']);
     }
