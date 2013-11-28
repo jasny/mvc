@@ -62,6 +62,7 @@ class Twig extends \Jasny\View
      * 
      * @param string $path   Path to the templates 
      * @param string $cache  The cache directory or false if cache is disabled.
+     * @return \Twig_Environment
      */
     public static function init($path, $cache=false)
     {
