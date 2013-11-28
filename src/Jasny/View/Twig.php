@@ -60,14 +60,14 @@ class Twig extends \Jasny\View
     /**
      * Init Twig environment
      * 
-     * @param string $path   Path to the templates 
-     * @param string $cache  The cache directory or false if cache is disabled.
+     * @param string|array $path   Path to the templates 
+     * @param string       $cache  The cache directory or false if cache is disabled.
      * @return \Twig_Environment
      */
-    public static function init($path, $cache=false)
+    public static function init($path=null, $cache=false)
     {
-        if (!isset(self::$default)) self::$default = '\\' . get_called_class();
-        
+        if (!isset($path)) $path = getcwd();
+                
         $loader = new \Twig_Loader_Filesystem($path);
 
         // Set options like caching or debug http://twig.sensiolabs.org/doc/api.html#environment-options
@@ -84,7 +84,6 @@ class Twig extends \Jasny\View
         
         // Set globals http://twig.sensiolabs.org/doc/advanced.html#globals
         $twig->addGlobal('current_url', rtrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/'));
-        if (Router::isUsed()) $twig->addGlobal('current_route', Router::getRoute());
         
         self::$environment = $twig;
         return self::$environment;
@@ -95,7 +94,7 @@ class Twig extends \Jasny\View
      */
     public static function getEnvironment()
     {
-        if (!isset(static::$environment)) static::init((defined('BASE_PATH') ? BASE_PATH : getcwd()) . '/views');
+        if (!isset(static::$environment)) static::init();
         return static::$environment;
     }
 }

@@ -8,12 +8,13 @@ namespace Jasny;
 abstract class View
 {
     /**
-     * Class name default loader.
-     * Relative to namespace Jasny\View.
-     * 
-     * @var string
+     * Mapping extension to loader
+     * @var type 
      */
-    public static $default;
+    public static $map = [
+        'twig' => '\Jasny\View\Twig'
+    ];
+    
     
     /**
      * Cached flash message
@@ -52,14 +53,18 @@ abstract class View
     /**
      * Get the view loader class to use
      * 
+     * @param string $ext  File extension
      * @return string
      */
-    protected final static function getClass()
+    protected final static function getClass($ext)
     {
         $class = get_called_class();
         
         $refl = new \ReflectionClass($class);
-        if ($refl->isAbstract()) $class = (self::$default[0] == '\\' ? '' : __CLASS__ . '\\') . ucfirst(self::$default);
+        if ($refl->isAbstract()) {
+            if (!isset(self::$map[$ext])) throw new \Exception("Don't know how to view a '.$ext' file");
+            $class = self::$map[$ext];
+        }
         
         return $class;
     }
@@ -72,7 +77,7 @@ abstract class View
      */
     public static function load($name)
     {
-        $class = static::getClass();
+        $class = static::getClass(pathinfo($name, PATHINFO_EXTENSION));
         return new $class($name);
     }
     
