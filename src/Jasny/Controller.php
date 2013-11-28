@@ -7,6 +7,22 @@ namespace Jasny;
 abstract class Controller
 {
     /**
+     * Used router
+     * @var Router
+     */
+    protected $router;
+
+    /**
+     * Class constructor
+     * 
+     * @param Router $router
+     */
+    public function __construct($router=null)
+    {
+        $this->router = $router;
+    }
+    
+    /**
      * Show a view.
      * 
      * @param string $name     Filename of Twig template
@@ -29,7 +45,18 @@ abstract class Controller
      */
     protected function redirect($url, $http_code = 303)
     {
-        return Router::i()->redirect($url, $http_code);
+        if ($this->router) return $this->router->redirect($url, $http_code);
+        
+        // Turn relative URL into absolute URL
+        if (strpos($url, '://') === false) {
+            if ($url == '' || $url[0] != '/') $url = dirname($_SERVER['REQUEST_URI']) . '/' . $url;
+            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . $this->rebase($url);
+        }
+
+        header("Location: $url", true, $http_code);
+        echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
+        
+        exit();
     }
 
     /**
@@ -39,7 +66,11 @@ abstract class Controller
      */
     protected function notFound($message=null)
     {
-        return Router::i()->notFound($message);
+        if ($this->router) return $this->router->notFound($message);
+        
+        header((@$_SERVER['SERVER_PROTOCOL'] ?: 'HTTP/1.1') . ' 404 Not Found');
+        echo $message ?: "Sorry, this page does not exist";
+        exit();
     }
 
     /**
@@ -49,7 +80,13 @@ abstract class Controller
      */
     protected function badRequest($message)
     {
-        return Router::i()->badRequest($message);
+        if ($this->router) return $this->router->badRequest($message);
+        
+        if (ob_get_level() > 1) ob_end_clean();
+
+        header((@$_SERVER['SERVER_PROTOCOL'] ?: 'HTTP/1.1') . ' 400 Bad Request');
+        echo $message;
+        exit();
     }
     
     

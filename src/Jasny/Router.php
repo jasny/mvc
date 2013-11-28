@@ -257,7 +257,7 @@ class Router
 
         if (!class_exists($class)) return $this->notFound();
 
-        $controller = new $class();
+        $controller = new $class($this);
         if (!is_callable([$controller, $method])) return $this->notFound();
 
         $ret = call_user_func_array([$controller, $method], $args);
@@ -312,7 +312,7 @@ class Router
      * 
      * @return string;
      */
-    protected function getProtocol()
+    protected static function getProtocol()
     {
         return @$_SERVER['SERVER_PROTOCOL'] ?: 'HTTP/1.1';
     }
@@ -348,7 +348,7 @@ class Router
     {
         if (ob_get_level() > 1) ob_end_clean();
 
-        header($this->getProtocol() . ' 400 Bad Request');
+        header(self::getProtocol() . ' 400 Bad Request');
         if (!$this->routeTo(400, ['args'=>[400, $message]])) echo $message;
         exit();
     }
@@ -364,7 +364,7 @@ class Router
 
         if (!isset($message)) $message = "Sorry, this page does not exist";
         
-        header($this->getProtocol() . ' 404 Not Found');
+        header(self::getProtocol() . ' 404 Not Found');
         if (!$this->routeTo(404, ['args'=>[404, $message]])) echo $message;
         exit();
     }
@@ -379,7 +379,7 @@ class Router
     {
         if (ob_get_level() > 1) ob_end_clean();
 
-        header($this->getProtocol() . ' 500 Internal Server Error');
+        header(self::getProtocol() . ' 500 Internal Server Error');
         return (boolean)$this->routeTo(500, ['args'=>[500, $error]]);
     }
     
