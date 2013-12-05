@@ -42,7 +42,7 @@ class Twig extends \Jasny\View
      */
     public function render($context)
     {
-        $this->template->render($context);
+        return $this->template->render($context);
     }
     
     /**
