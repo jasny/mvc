@@ -50,7 +50,7 @@ abstract class Controller
         // Turn relative URL into absolute URL
         if (strpos($url, '://') === false) {
             if ($url == '' || $url[0] != '/') $url = dirname($_SERVER['REQUEST_URI']) . '/' . $url;
-            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . $this->rebase($url);
+            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . $url;
         }
 
         header("Location: $url", true, $http_code);
