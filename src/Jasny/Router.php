@@ -61,7 +61,9 @@ class Router
      */
     public function setRoutes($routes)
     {
-        $this->routes = (array)$routes;
+        if (is_object($routes)) $routes = get_object_vars($routes);
+        
+        $this->routes = $routes;
         $this->route = null;
         
         return $this;
@@ -164,6 +166,7 @@ class Router
         $this->getRoutes(); // Make sure the routes are initialised
         
         if ($url !== '/') $url = rtrim($url, '/');
+        if (substr($url, 0, 2) == '/:') $url = substr($url, 2);
 
         foreach (array_keys($this->routes) as $route) {
             if ($route !== '/') $route = rtrim($route, '/');
@@ -243,7 +246,7 @@ class Router
 
             return include $file;
         }
-
+        
         // Route to controller
         if (empty($route->controller) || empty($route->action)) {
             trigger_error("Failed to route using '{$route->route}': "
@@ -432,9 +435,15 @@ class Router
                 continue;
             }
 
-            $options = explode('|', $var);
+            $options = preg_split('/(?<!\\\\)\|/', $var);
             $var = null;
 
+            $replace_fn = function($match) use ($parts) {
+                $i = $match[1];
+                $i = $i > 0 ? $i - 1 : count($parts) - $i;
+                return $parts[$i];
+            };
+            
             foreach ($options as $option) {
                 if ($option[0] === '$') {
                     $i = (int)substr($option, 1);
@@ -453,7 +462,7 @@ class Router
                         $pos += count($slice) - 1;
                     }
                 } else {
-                    $var = preg_replace('/^([\'"])(.*)\1$/', '$2', $option); // Unquote
+                    $var = preg_replace_callback('/(?<!\\\\)\$(\d+)/', $replace_fn, $option);
                 }
 
                 if (!empty($var)) break; // continues if option can't be used
@@ -461,7 +470,8 @@ class Router
 
             $pos++;
         }
-
+        unset($var);
+        
         return $vars;
     }
 
