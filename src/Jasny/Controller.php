@@ -22,15 +22,36 @@ abstract class Controller
         $this->router = $router;
     }
     
+
+    /**
+     * Returns the HTTP referer if it is on the current host.
+     * 
+     * <code>
+     *   $this->redirect($this->localReferer() ?: '/'); // Back to previous page on our website
+     * </code>
+     * 
+     * @return string
+     */
+    protected function localReferer()
+    {
+        return !empty($_SERVER['HTTP_REFERER']) && parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST) == $_SERVER['HTTP_HOST'] ?
+            $_SERVER['HTTP_REFERER'] : null;
+    }
+    
+    
     /**
      * Show a view.
      * 
      * @param string $name     Filename of Twig template
      * @param array  $context  Data
      */
-    protected function view($name, $context = array())
+    protected function view($name=null, $context=[])
     {
-        header('Content-type: text/html; charset=utf-8');
+        if (isset($this->router)) {
+            if (!isset($name)) $name = $this->router()->get('controller') . '/' . $this->router()->get('action');
+            View::addGlobal('current_route', $this->router->getRoute());
+        }
+        
         View::load($name)->display($context);
     }
     

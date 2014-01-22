@@ -2,8 +2,6 @@
 
 namespace Jasny\View;
 
-use \Jasny\Router;
-
 /**
  * View using Twig
  */
@@ -12,12 +10,6 @@ class Twig extends \Jasny\View
     /** @var \Twig_Template */
     protected $template;
     
-    
-    /**
-     * Cached flash message
-     * @var array
-     */
-    protected static $flash;
     
     /** @var \Twig_Environment */
     protected static $environment;
@@ -53,6 +45,7 @@ class Twig extends \Jasny\View
      */
     public function display($context)
     {
+        header('Content-type: text/html; charset=utf-8');
         $this->template->display($context);
     }
     
@@ -75,7 +68,7 @@ class Twig extends \Jasny\View
         $twig->setCache($cache);
         
         // Add filters and extensions http://twig.sensiolabs.org/doc/api.html#using-extensions
-        $twig->addFunction(new \Twig_SimpleFunction('flash', [__CLASS__, 'getFlash']));
+        $twig->addFunction(new \Twig_SimpleFunction('useFlash', [__CLASS__, 'useFlash']));
         
         if (class_exists('Jasny\Twig\DateExtension')) $twig->addExtension(new \Jasny\Twig\DateExtension());
         if (class_exists('Jasny\Twig\PcreExtension')) $twig->addExtension(new \Jasny\Twig\PcreExtension());
@@ -91,10 +84,23 @@ class Twig extends \Jasny\View
 
     /**
      * Get Twig environment
+     * 
+     * @return \Twig_Environment
      */
     public static function getEnvironment()
     {
         if (!isset(static::$environment)) static::init();
         return static::$environment;
+    }
+    
+    /**
+     * Add a global variable to the view.
+     * 
+     * @param string $name   Variable name
+     * @param mixed  $value
+     */
+    public static function addGlobal($name, $value)
+    {
+        static::getEnvironment()->addGlobal($name, $value);
     }
 }

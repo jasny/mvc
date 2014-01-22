@@ -99,7 +99,7 @@ abstract class View
      * 
      * @return array
      */
-    public static function getFlash()
+    public static function useFlash()
     {
         if (isset($_SESSION['flash'])) {
             self::$flash = $_SESSION['flash'];
@@ -108,4 +108,12 @@ abstract class View
         
         return self::$flash;
     }
+    
+    /**
+     * Add a global variable to the view.
+     * 
+     * @param string $name   Variable name
+     * @param mixed  $value
+     */
+    abstract public static function addGlobal($name, $value);
 }
