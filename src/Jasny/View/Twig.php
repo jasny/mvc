@@ -2,10 +2,12 @@
 
 namespace Jasny\View;
 
+use Jasny\View;
+
 /**
  * View using Twig
  */
-class Twig extends \Jasny\View
+class Twig extends View
 {
     /** @var \Twig_Template */
     protected $template;
@@ -48,10 +50,24 @@ class Twig extends \Jasny\View
         header('Content-type: text/html; charset=utf-8');
         $this->template->display($context);
     }
+
+    /**
+     * Add a global variable to the view.
+     * 
+     * @param string $name   Variable name
+     * @param mixed  $value
+     * @return Twig $this
+     */
+    public function set($name, $value)
+    {
+        static::getEnvironment()->addGlobal($name, $value);
+        return $this;
+    }
     
     
     /**
-     * Init Twig environment
+     * Init Twig environment.
+     * Initializing automatically sets Twig to be used by default.
      * 
      * @param string|array $path   Path to the templates 
      * @param string       $cache  The cache directory or false if cache is disabled.
@@ -59,8 +75,10 @@ class Twig extends \Jasny\View
      */
     public static function init($path=null, $cache=false)
     {
+        if (View::using() == null) View::using('twig');
+        
         if (!isset($path)) $path = getcwd();
-                
+        
         $loader = new \Twig_Loader_Filesystem($path);
 
         // Set options like caching or debug http://twig.sensiolabs.org/doc/api.html#environment-options
@@ -91,16 +109,5 @@ class Twig extends \Jasny\View
     {
         if (!isset(static::$environment)) static::init();
         return static::$environment;
-    }
-    
-    /**
-     * Add a global variable to the view.
-     * 
-     * @param string $name   Variable name
-     * @param mixed  $value
-     */
-    public static function addGlobal($name, $value)
-    {
-        static::getEnvironment()->addGlobal($name, $value);
     }
 }

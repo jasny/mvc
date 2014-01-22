@@ -3,10 +3,23 @@
 namespace Jasny;
 
 /**
- * Base class for view loaders
+ * Base class for view loaders.
+ * 
+ * <code>
+ *   View::load("index.html.twig")->display();  // Specify the extension of the template
+ * 
+ *   View::using('twig');                       // or set the default view loader
+ *   View::load("index")->display();
+ * </code>
  */
 abstract class View
 {
+    /**
+     * The default view (by extension)
+     * @var type
+     */
+    public static $default;
+    
     /**
      * Mapping extension to loader
      * @var type 
@@ -14,14 +27,13 @@ abstract class View
     public static $map = [
         'twig' => '\Jasny\View\Twig'
     ];
-    
-    
+
     /**
      * Cached flash message
      * @var array
      */
     protected static $flash;
-    
+
     
     /**
      * Class constructor
@@ -44,24 +56,44 @@ abstract class View
      * @param array $context
      * @return string
      */
-    public function display($context)
-    {
-        echo $this->template->render($context);
-    }
+    abstract public function display($context);
 
+    /**
+     * Set a global variable.
+     * 
+     * @param string $name   Variable name
+     * @param mixed  $value
+     * @return View $this
+     */
+    abstract public function set($name, $value);
+
+    /**
+     * Get or set default view loader
+     * 
+     * @param string $ext
+     * @return string
+     */
+    public static function using($ext=null)
+    {
+        if (isset($ext)) self::$default = $ext;
+        return self::$default;
+    }
     
     /**
      * Get the view loader class to use
      * 
-     * @param string $ext  File extension
+     * @param string $name  File name
      * @return string
      */
-    protected final static function getClass($ext)
+    protected final static function getClass($name)
     {
         $class = get_called_class();
         
         $refl = new \ReflectionClass($class);
         if ($refl->isAbstract()) {
+            $ext = pathinfo($name, PATHINFO_EXTENSION) ?: self::$default;
+            if (!$ext) throw new \Exception("Don't know how to view '$name'. No extension and no default view loader");
+            
             if (!isset(self::$map[$ext])) throw new \Exception("Don't know how to view a '.$ext' file");
             $class = self::$map[$ext];
         }
@@ -77,7 +109,7 @@ abstract class View
      */
     public static function load($name)
     {
-        $class = static::getClass(pathinfo($name, PATHINFO_EXTENSION));
+        $class = static::getClass($name);
         return new $class($name);
     }
     
@@ -108,12 +140,4 @@ abstract class View
         
         return self::$flash;
     }
-    
-    /**
-     * Add a global variable to the view.
-     * 
-     * @param string $name   Variable name
-     * @param mixed  $value
-     */
-    abstract public static function addGlobal($name, $value);
 }

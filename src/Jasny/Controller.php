@@ -47,12 +47,12 @@ abstract class Controller
      */
     protected function view($name=null, $context=[])
     {
-        if (isset($this->router)) {
-            if (!isset($name)) $name = $this->router()->get('controller') . '/' . $this->router()->get('action');
-            View::addGlobal('current_route', $this->router->getRoute());
-        }
-        
-        View::load($name)->display($context);
+        if (!isset($name) && isset($this->router))
+            $name = $this->router()->get('controller') . '/' . $this->router()->get('action');
+
+        View::load($name)
+            ->set('current_route', $this->router->getRoute())
+            ->display($context);
     }
     
     
