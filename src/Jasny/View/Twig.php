@@ -1,16 +1,17 @@
 <?php
 
-namespace Jasny\View;
-
-use Jasny\View;
+namespace Jasny;
 
 /**
  * View using Twig
  */
-class Twig extends View
+class View_Twig extends View
 {
     /** @var \Twig_Template */
     protected $template;
+    
+    /** @var \Twig_Environment */
+    protected $env;
     
     
     /** @var \Twig_Environment */
@@ -25,7 +26,9 @@ class Twig extends View
     public function __construct($name)
     {
         if (!pathinfo($name, PATHINFO_EXTENSION)) $name .= '.html.twig';
-        $this->template = self::getEnvironment()->loadTemplate($name);
+        
+        $this->env = clone self::getEnvironment();
+        $this->template = $this->env->loadTemplate($name);
     }
 
     /**
@@ -51,16 +54,30 @@ class Twig extends View
         $this->template->display($context);
     }
 
+    
     /**
      * Add a global variable to the view.
      * 
      * @param string $name   Variable name
      * @param mixed  $value
-     * @return Twig $this
+     * @return View_Twig $this
      */
     public function set($name, $value)
     {
-        static::getEnvironment()->addGlobal($name, $value);
+        $this->env->addGlobal($name, $value);
+        return $this;
+    }
+    
+    /**
+     * Expose a function to the view.
+     * 
+     * @param string $function  Variable name
+     * @param mixed  $callback
+     * @return View_Twig $this
+     */
+    public function expose($function, $callback=null)
+    {
+        $this->env->addFunction(new \Twig_SimpleFunction($function, $callback ?: $function));
         return $this;
     }
     

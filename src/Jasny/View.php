@@ -25,7 +25,7 @@ abstract class View
      * @var type 
      */
     public static $map = [
-        'twig' => '\Jasny\View\Twig'
+        'twig' => 'Jasny\View_Twig'
     ];
 
     /**
@@ -58,6 +58,7 @@ abstract class View
      */
     abstract public function display($context);
 
+    
     /**
      * Set a global variable.
      * 
@@ -66,7 +67,17 @@ abstract class View
      * @return View $this
      */
     abstract public function set($name, $value);
+    
+    /**
+     * Expose a function to the view.
+     * 
+     * @param string $function  Variable name
+     * @param mixed  $callback
+     * @return View $this
+     */
+    abstract public function expose($function, $callback=null);
 
+    
     /**
      * Get or set default view loader
      * 
