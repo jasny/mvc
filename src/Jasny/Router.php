@@ -430,6 +430,8 @@ class Router
     {
         $pos = 0;
         foreach ($vars as $key => &$var) {
+            if (!isset($var)) continue;
+            
             if (!is_scalar($var)) {
                 $var = $this->bind($var, $parts);
                 continue;
