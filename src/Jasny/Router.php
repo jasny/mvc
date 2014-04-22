@@ -7,7 +7,7 @@ namespace Jasny;
  * 
  * Wildcards:
  *  ?          Single character
- *  #          One or more digits (custom extension)
+ *  #          One or more digits
  *  *          One or more characters
  *  **         Any number of subdirs
  *  [abc]      Match character 'a', 'b' or 'c'
@@ -69,6 +69,31 @@ class Router
         return $this;
     }
 
+    /**
+     * Add routes to existing list
+     * 
+     * @param array  $routes  Array with route objects
+     * @param string $root    Specify the root dir for routes
+     * @return Router
+     */
+    public function addRoutes($routes, $root=null)
+    {
+        if (is_object($routes)) $routes = get_object_vars($routes);
+        
+        foreach ($routes as $path=>$route) {
+            if (!empty($root)) $path = $root . $path;
+            
+            if (isset($this->routes[$path])) {
+                trigger_error("Route $path is already defined.", E_USER_WARNING);
+                continue;
+            }
+            
+            $this->routes[$path] = $route;
+        }
+        
+        return $this;
+    }
+    
     /**
      * Get a list of all routes
      * 
@@ -134,7 +159,8 @@ class Router
     }
 
     /**
-     * Get the URL to route
+     * Get the URL to route.
+     * Defaults to REQUEST_URI.
      * 
      * @return string
      */
@@ -203,15 +229,15 @@ class Router
     }
 
     /**
-     * Get a parameter of the matching route.
+     * Get a property of the matching route.
      * 
-     * @param string $name   Parameter name
+     * @param string $prop  Property name
      * @return mixed
      */
-    public function get($name)
+    public function get($prop)
     {
         $route = $this->getRoute();
-        return @$route->$name;
+        return isset($route->$prop) ? $route->$prop : null;
     }
     
     
@@ -222,7 +248,7 @@ class Router
      * @param object $overwrite
      * @return boolean|mixed  Whatever the controller returns or true on success
      */
-    protected function routeTo($route, $overwrite=[])
+    protected function routeTo(Route $route, $overwrite=[])
     {
         if (!is_object($route)) {
             $match = $this->findRoute($route);
@@ -254,8 +280,8 @@ class Router
             return false;
         }
 
-        $class = $this->camelcase($route->controller) . 'Controller';
-        $method = lcfirst($this->camelcase($route->action)) . 'Action';
+        $class = $this->getControllerClass($route->controller);
+        $method = $this->getActionMethod($route->action);
         $args = isset($route->args) ? $route->args : [];
 
         if (!class_exists($class)) return $this->notFound();
@@ -301,7 +327,7 @@ class Router
      * @param array  $errcontext
      * @return boolean
      */
-    protected function onError($errno, $errstr, $errfile, $errline, $errcontext)
+    public function onError($errno, $errstr, $errfile, $errline, $errcontext)
     {
         if (!(error_reporting() & $errno)) return null;
         
@@ -317,7 +343,7 @@ class Router
      */
     protected static function getProtocol()
     {
-        return @$_SERVER['SERVER_PROTOCOL'] ?: 'HTTP/1.1';
+        return isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1';
     }
     
     /**
@@ -477,6 +503,29 @@ class Router
         return $vars;
     }
 
+    
+    /**
+     * Get the class name of the controller
+     * 
+     * @param string $controller
+     * @return string
+     */
+    protected function getControllerClass($controller)
+    {
+        return $this->camelcase($controller) . 'Controller';
+    }
+    
+    /**
+     * Get the method name of the action
+     * 
+     * @param string $action
+     * @return string
+     */
+    protected function getActionMethod($action)
+    {
+        return lcfirst($this->camelcase($action) . 'Action');
+    }
+    
     /**
      * CamelCase a word
      * 
@@ -486,5 +535,5 @@ class Router
     protected function camelcase($string)
     {
         return strtr(ucwords(strtr($string, '_-', '  ')), [' '=>'']);
-    }
+    }    
 }
