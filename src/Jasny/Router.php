@@ -248,7 +248,7 @@ class Router
      * @param object $overwrite
      * @return boolean|mixed  Whatever the controller returns or true on success
      */
-    protected function routeTo(Route $route, $overwrite=[])
+    protected function routeTo($route, $overwrite=[])
     {
         if (!is_object($route)) {
             $match = $this->findRoute($route);
