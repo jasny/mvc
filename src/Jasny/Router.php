@@ -376,7 +376,7 @@ class Router
 
         foreach (array_keys($this->routes) as $route) {
             if (strpos($route, ' ') !== false && preg_match('/^[A-Z]+\s/', $route)) {
-                list($route_method, $route_path) = explode(' ', $route, 2);
+                list($route_method, $route_path) = preg_split('/\s+/', $route, 2);
                 if ($route_method !== $method) return;
             } else {
                 $route_path = $route;
