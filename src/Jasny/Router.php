@@ -383,6 +383,22 @@ class Router
     }
 
     /**
+     * Give a 403 Forbidden response and exit
+     * 
+     * @param string $message
+     */
+    public function forbidden($message=null)
+    {
+        if (ob_get_level() > 1) ob_end_clean();
+
+        if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
+        
+        header(self::getProtocol() . ' 403 Forbidden');
+        if (!$this->routeTo(403, ['args'=>[403, $message]])) echo $message;
+        exit();
+    }
+    
+    /**
      * Give a 404 Not Found response and exit
      * 
      * @param string $message

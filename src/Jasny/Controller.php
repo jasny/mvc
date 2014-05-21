@@ -121,6 +121,20 @@ abstract class Controller
     }
 
     /**
+     * Give a 403 Forbidden response
+     * 
+     * @param string $message
+     */
+    protected function forbidden($message=null)
+    {
+        if ($this->router) return $this->router->forbidden($message);
+        
+        header((!empty($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1') . ' 403 Forbidden');
+        echo $message ?: "Sorry, you are not allowed to view this page";
+        exit();
+    }
+
+    /**
      * Give a 404 Not Found response
      * 
      * @param string $message
