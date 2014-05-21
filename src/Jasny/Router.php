@@ -324,6 +324,18 @@ class Router
         return $this->url;
     }
 
+    /**
+     * Split the URL and return a part
+     * 
+     * @param int $i  Part number, starts at 1
+     * @return string
+     */
+    public function getUrlPart($i)
+    {
+        $parts = $this->splitUrl($this->getUrl());
+        return $parts[$i - 1];
+    }
+    
     
     /**
      * Set the output format for messages.
