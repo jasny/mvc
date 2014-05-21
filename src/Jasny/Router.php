@@ -110,6 +110,36 @@ class Router
 
     
     /**
+     * Set the method to route
+     * 
+     * @param string $method
+     * @return Router
+     */
+    public function setMethod($method)
+    {
+        $this->method = $method;
+        $this->route = null;
+
+        return $this;
+    }
+
+    /**
+     * Get the method to route.
+     * Defaults to REQUEST_METHOD, which can be overwritten by $_POST['_method'].
+     * 
+     * @return string
+     */
+    public function getMethod()
+    {
+        if (!isset($this->method)) {
+            $this->method = strtoupper(!empty($_POST['_method']) ? $_POST['_method'] : $_SERVER['REQUEST_METHOD']);
+        }
+        
+        return $this->method;
+    }
+    
+    
+    /**
      * Set the webroot subdir from DOCUMENT_ROOT.
      * 
      * @param string $dir
@@ -184,10 +214,11 @@ class Router
     /**
      * Find a matching route
      * 
+     * @param string $method
      * @param string $url
      * @return string
      */
-    protected function findRoute($url)
+    protected function findRoute($method, $url)
     {
         $this->getRoutes(); // Make sure the routes are initialised
         
@@ -195,8 +226,15 @@ class Router
         if (substr($url, 0, 2) == '/:') $url = substr($url, 2);
 
         foreach (array_keys($this->routes) as $route) {
-            if ($route !== '/') $route = rtrim($route, '/');
-            if ($this->fnmatch($route, $url)) return $route;
+            if (strpos($route, ' ') !== false && preg_match('/^[A-Z]+\s/', $route)) {
+                list($route_method, $route_path) = explode(' ', $route, 2);
+                if ($route_method !== $method) return;
+            } else {
+                $route_path = $route;
+            }
+            
+            if ($route_path !== '/') $route_path = rtrim($route_path, '/');
+            if ($this->fnmatch($route_path, $url)) return $route;
         }
 
         return false;
@@ -211,12 +249,14 @@ class Router
     {
         if (isset($this->route)) return $this->route;
 
+        $method = $this->getMethod();
         $url = $this->getUrl();
+        
         if ($this->getBase()) {
             $url = '/' . preg_replace('~^' . preg_quote(trim($this->getBase(), '/'), '~') . '~', '', ltrim($url, '/'));
         }
 
-        $match = $this->findRoute($url);
+        $match = $this->findRoute($method, $url);
 
         if ($match) {
             $this->route = $this->bind($this->routes[$match], $this->splitUrl($url));
@@ -251,7 +291,7 @@ class Router
     protected function routeTo($route, $overwrite=[])
     {
         if (!is_object($route)) {
-            $match = $this->findRoute($route);
+            $match = $this->findRoute(null, $route);
             if (!isset($match) || !isset($this->routes[$match])) return false;
             $route = $this->routes[$match];
         }
@@ -435,7 +475,7 @@ class Router
      * @param string $url
      * @return array
      */
-    public function splitUrl($url)
+    public static function splitUrl($url)
     {
         $url = parse_url(trim($url, '/'), PHP_URL_PATH);
         return $url ? explode('/', $url) : array();
@@ -448,7 +488,7 @@ class Router
      * @param string $path
      * @return boolean
      */
-    public function fnmatch($pattern, $path)
+    public static function fnmatch($pattern, $path)
     {
         $regex = preg_quote($pattern, '~');
         $regex = strtr($regex, ['\?' => '[^/]', '\*' => '[^/]*', '/\*\*' => '(?:/.*)?', '#' => '\d+', '\[' => '[',
@@ -468,14 +508,14 @@ class Router
      * @param array        $parts  URL parts
      * @return array
      */
-    protected function bind($vars, array $parts)
+    protected static function bind($vars, array $parts)
     {
         $pos = 0;
         foreach ($vars as $key => &$var) {
             if (!isset($var)) continue;
             
             if (!is_scalar($var)) {
-                $var = $this->bind($var, $parts);
+                $var = static::bind($var, $parts);
                 continue;
             }
 
@@ -526,9 +566,9 @@ class Router
      * @param string $controller
      * @return string
      */
-    protected function getControllerClass($controller)
+    protected static function getControllerClass($controller)
     {
-        return $this->camelcase($controller) . 'Controller';
+        return self::camelcase($controller) . 'Controller';
     }
     
     /**
@@ -537,9 +577,9 @@ class Router
      * @param string $action
      * @return string
      */
-    protected function getActionMethod($action)
+    protected static function getActionMethod($action)
     {
-        return lcfirst($this->camelcase($action) . 'Action');
+        return lcfirst(self::camelcase($action) . 'Action');
     }
     
     /**
@@ -548,7 +588,7 @@ class Router
      * @param string $string
      * @return string
      */
-    protected function camelcase($string)
+    protected static function camelcase($string)
     {
         return strtr(ucwords(strtr($string, '_-', '  ')), [' '=>'']);
     }    
