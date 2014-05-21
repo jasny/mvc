@@ -33,23 +33,18 @@ abstract class Controller
      */
     public function getRequestMethod()
     {
-        return strtoupper(!empty($_POST['_method']) ? $_POST['_method'] : $_SERVER['REQUEST_METHOD']);
+        return Router::getRequestMethod();
     }
     
     /**
      * Check if we should output a specific format.
      * Defaults to html.
      * 
-     * @return string  'json', 'xml', 'text' or 'html'
+     * @return string  'html', 'json', 'xml', 'text', 'js', 'css', 'png', 'gif' or 'jpeg'
      */
     protected function getRequestFormat()
     {
-        if (empty($_SERVER['HTTP_ACCEPT'])) return 'html';
-        
-        if (preg_match('~^application/json\b~', $_SERVER['HTTP_ACCEPT'])) return 'json';
-        if (preg_match('~^text/xml\b~', $_SERVER['HTTP_ACCEPT'])) return 'xml';
-        if (preg_match('~^text/plain\b~', $_SERVER['HTTP_ACCEPT'])) return 'text';
-        return 'html';
+        return Router::getRequestFormat();
     }
 
     /**
@@ -59,23 +54,27 @@ abstract class Controller
      */
     protected function isAjaxRequest()
     {
-        return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
-            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        return Router::isAjaxRequest();
     }
 
     /**
-     * Returns the HTTP referer if it is on the current host.
+     * Check if requested to wrap JSON as JSONP response.
      * 
-     * <code>
-     *   $this->redirect($this->localReferer() ?: '/'); // Back to previous page on our website
-     * </code>
+     * @return boolean
+     */
+    protected function isJsonpRequest()
+    {
+        return Router::isJsonpRequest();
+    }
+    
+    /**
+     * Returns the HTTP referer if it is on the current host.
      * 
      * @return string
      */
-    protected function localReferer()
+    protected function getLocalReferer()
     {
-        return !empty($_SERVER['HTTP_REFERER']) && parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST) ==
-            $_SERVER['HTTP_HOST'] ? $_SERVER['HTTP_REFERER'] : null;
+        return Router::getLocalReferer();
     }
     
     
@@ -95,6 +94,33 @@ abstract class Controller
             ->display($context);
     }
     
+    /**
+     * Output result as JSON.
+     * Supports JSONP.
+     * 
+     * @param mixed $result
+     * @param int   $options  json_encode options
+     */
+    protected function outputJSON($result, $options=0)
+    {
+        if ($this->isJsonpRequest()) {
+            header("Content-Type: application/javascript");
+            echo $_GET['callback'] . '(' . json_encode($result, $options) . ')';
+        } else {
+            header("Content-Type: application/json");
+            echo json_encode($result, $options);
+        }
+    }
+
+    
+    /**
+     * Redirect to previous page.
+     * Must be on this website, otherwise redirect to home.
+     */
+    protected function back()
+    {
+        $this->redirect(Router::getLocalReferer() ?: '/', 303);
+    }
     
     /**
      * Redirect to another page.
@@ -104,33 +130,47 @@ abstract class Controller
      * @param string $url 
      * @param int    $http_code  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
      */
-    protected function redirect($url, $http_code = 303)
+    protected function redirect($url, $http_code=303)
     {
-        if ($this->router) return $this->router->redirect($url, $http_code);
+        Router::redirect($url, $http_code);
+    }
+    
+    
+    /**
+     * Give a 400 Bad Request response
+     * 
+     * @param string $message
+     */
+    protected function badRequest($message, $http_code=400)
+    {
+        if ($this->router) return $this->router->badRequest($message, $http_code);
         
-        // Turn relative URL into absolute URL
-        if (strpos($url, '://') === false) {
-            if ($url == '' || $url[0] != '/') $url = dirname($_SERVER['REQUEST_URI']) . '/' . $url;
-            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . $url;
-        }
-
-        header("Location: $url", true, $http_code);
-        echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
-        
+        Router::outputHttpError($http_code, $message);
         exit();
     }
 
+    /**
+     * Route to 401, otherwise result in a 403 forbidden.
+     * 
+     * Note: While the 401 route is used, we don't respond with a 401 http status code.
+     */
+    public function requireLogin()
+    {
+        if ($this->router) return $this->router->requireLogin();
+        $this->forbidden();
+    }
+    
     /**
      * Give a 403 Forbidden response
      * 
      * @param string $message
      */
-    protected function forbidden($message=null)
+    protected function forbidden($message=null, $http_code=403)
     {
-        if ($this->router) return $this->router->forbidden($message);
+        if ($this->router) return $this->router->forbidden($message, $http_code);
         
-        header((!empty($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1') . ' 403 Forbidden');
-        echo $message ?: "Sorry, you are not allowed to view this page";
+        if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
+        Router::outputHttpError($http_code, $message);
         exit();
     }
 
@@ -139,28 +179,27 @@ abstract class Controller
      * 
      * @param string $message
      */
-    protected function notFound($message=null)
+    protected function notFound($message=null, $http_code=404)
     {
-        if ($this->router) return $this->router->notFound($message);
+        if ($this->router) return $this->router->notFound($message, $http_code);
         
-        header((!empty($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1') . ' 404 Not Found');
-        echo $message ?: "Sorry, this page does not exist";
+        if (!isset($message)) $message = "Sorry, this page does not exist";
+        Router::outputHttpError($http_code, $message);
         exit();
     }
-
+    
     /**
-     * Give a 400 Bad Request response
+     * Give a 500 Internal Server Error response and exit
      * 
      * @param string $message
+     * @param int    $http_code  Alternative HTTP status code
+     * @return boolean
      */
-    protected function badRequest($message)
+    public function error($message, $http_code=500)
     {
-        if ($this->router) return $this->router->badRequest($message);
+        if ($this->router) return $this->router->error($message, $http_code);
         
-        if (ob_get_level() > 1) ob_end_clean();
-
-        header((!empty($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1') . ' 400 Bad Request');
-        echo $message;
+        Router::outputHttpError($http_code, $message);
         exit();
     }
     
