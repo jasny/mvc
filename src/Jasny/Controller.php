@@ -142,7 +142,18 @@ abstract class Controller
      */
     protected function redirect($url, $http_code=303)
     {
-        Router::redirect($url, $http_code);
+        if ($this->router) return $this->router->redirect($url, $http_code);
+        
+        // Turn relative URL into absolute URL
+        if (strpos($url, '://') === false) {
+            if ($url == '' || $url[0] != '/') $url = dirname($_SERVER['REQUEST_URI']) . '/' . $url;
+            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . $url;
+        }
+
+        header("Location: $url", true, $http_code);
+        echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
+        
+        exit();
     }
     
     

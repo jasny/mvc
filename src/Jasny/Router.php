@@ -554,7 +554,7 @@ class Router
      * @param string $url 
      * @param int    $http_code  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
      */
-    public static function redirect($url, $http_code=303)
+    public function redirect($url, $http_code=303)
     {
         // Turn relative URL into absolute URL
         if (strpos($url, '://') === false) {
