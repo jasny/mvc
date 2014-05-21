@@ -168,13 +168,27 @@ abstract class Controller
     /**
      * Set flash message.
      * 
-     * @access protected
-     * @param mixed $type     flash type, error, notice, success
+     * @param mixed $type     flash type, eg. 'error', 'notice' or 'success'
      * @param mixed $message  flash message
-     * @return void
      */
-    protected function setFlash($type, $message)
+    public static function setFlash($type, $message)
     {
         $_SESSION['flash'] = ['type'=>$type, 'message'=>$message];
+    }
+    
+    /**
+     * Get the flash message.
+     */
+    public static function getFlash()
+    {
+        unset($_SESSION['flash']);
+    }
+    
+    /**
+     * Clear the flash message.
+     */
+    public static function clearFlash()
+    {
+        unset($_SESSION['flash']);
     }
 }
