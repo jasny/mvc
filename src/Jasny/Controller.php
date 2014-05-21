@@ -48,6 +48,16 @@ abstract class Controller
     }
 
     /**
+     * Shortcut for REQUEST_METHOD === 'POST'
+     * 
+     * @return boolean
+     */
+    public function isPostRequest()
+    {
+        return $this->getRequestMethod() === 'POST';
+    }
+    
+    /**
      * Check if request is an AJAX request.
      * 
      * @return boolean
