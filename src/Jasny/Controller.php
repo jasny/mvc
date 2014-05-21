@@ -24,6 +24,46 @@ abstract class Controller
     
 
     /**
+     * Return the request method.
+     * 
+     * Usually $_SERVER['REQUEST_METHOD'], but this can be overwritten by $_POST['_method'].
+     * Method is alway uppercase.
+     * 
+     * @return string
+     */
+    public function getRequestMethod()
+    {
+        return strtoupper(!empty($_POST['_method']) ? $_POST['_method'] : $_SERVER['REQUEST_METHOD']);
+    }
+    
+    /**
+     * Check if we should output a specific format.
+     * Defaults to html.
+     * 
+     * @return string  'json', 'xml', 'text' or 'html'
+     */
+    protected function getRequestFormat()
+    {
+        if (empty($_SERVER['HTTP_ACCEPT'])) return 'html';
+        
+        if (preg_match('~^application/json\b~', $_SERVER['HTTP_ACCEPT'])) return 'json';
+        if (preg_match('~^text/xml\b~', $_SERVER['HTTP_ACCEPT'])) return 'xml';
+        if (preg_match('~^text/plain\b~', $_SERVER['HTTP_ACCEPT'])) return 'text';
+        return 'html';
+    }
+
+    /**
+     * Check if request is an AJAX request.
+     * 
+     * @return boolean
+     */
+    protected function isAjaxRequest()
+    {
+        return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    }
+
+    /**
      * Returns the HTTP referer if it is on the current host.
      * 
      * <code>
@@ -34,8 +74,8 @@ abstract class Controller
      */
     protected function localReferer()
     {
-        return !empty($_SERVER['HTTP_REFERER']) && parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST) == $_SERVER['HTTP_HOST'] ?
-            $_SERVER['HTTP_REFERER'] : null;
+        return !empty($_SERVER['HTTP_REFERER']) && parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST) ==
+            $_SERVER['HTTP_HOST'] ? $_SERVER['HTTP_REFERER'] : null;
     }
     
     
@@ -89,7 +129,7 @@ abstract class Controller
     {
         if ($this->router) return $this->router->notFound($message);
         
-        header((@$_SERVER['SERVER_PROTOCOL'] ?: 'HTTP/1.1') . ' 404 Not Found');
+        header((!empty($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1') . ' 404 Not Found');
         echo $message ?: "Sorry, this page does not exist";
         exit();
     }
@@ -105,7 +145,7 @@ abstract class Controller
         
         if (ob_get_level() > 1) ob_end_clean();
 
-        header((@$_SERVER['SERVER_PROTOCOL'] ?: 'HTTP/1.1') . ' 400 Bad Request');
+        header((!empty($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1') . ' 400 Bad Request');
         echo $message;
         exit();
     }
