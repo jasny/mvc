@@ -514,8 +514,8 @@ class Router
      */
     public function handleErrors()
     {
-        set_error_handler(array(get_called_class(), 'onError'), E_RECOVERABLE_ERROR | E_USER_ERROR);
-        set_exception_handler(array(get_called_class(), 'onException'));
+        set_error_handler(array($this, 'onError'), E_RECOVERABLE_ERROR | E_USER_ERROR);
+        set_exception_handler(array($this, 'onException'));
     }
     
     /**
