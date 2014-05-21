@@ -58,6 +58,12 @@ class Router
     protected $routes;
 
     /**
+     * Method for route
+     * @var string 
+     */
+    protected $method;
+
+    /**
      * Webroot subdir from DOCUMENT_ROOT.
      * @var string
      */
@@ -68,6 +74,12 @@ class Router
      * @var string 
      */
     protected $url;
+
+    /**
+     * Output format
+     * @var string 
+     */
+    protected $format;
 
     /**
      * Variables from matched route (cached)
@@ -314,6 +326,31 @@ class Router
 
     
     /**
+     * Set the output format for messages.
+     * 
+     * @param string $format  'html', 'json', 'jsonp', 'xml', 'text', 'js', 'css', 'png', 'gif' or 'jpeg'
+     * @return Router
+     */
+    public function setOutputFormat($format)
+    {
+        $this->format = $format;
+        return $this;
+    }
+
+    /**
+     * Get the output format for messages.
+     * Determines it from ACCEPT header by default.
+     * 
+     * @return string
+     */
+    public function getOutputFormat()
+    {
+        if (!isset($this->format)) $this->format = self::getRequestFormat();
+        return $this->format;
+    }
+    
+    
+    /**
      * Check if the router has been used.
      * 
      * @return boolean
@@ -529,7 +566,7 @@ class Router
     public function badRequest($message, $http_code=400)
     {
         if (self::getRequestFormat() !== 'html') {
-            self::outputError($http_code, $message);
+            self::outputError($http_code, $message, $this->getOutputFormat());
             exit();
         }
         
@@ -562,7 +599,7 @@ class Router
         if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
         
         if (self::getRequestFormat() !== 'html') {
-            self::outputError($http_code, $message);
+            self::outputError($http_code, $message, $this->getOutputFormat());
             exit();
         }
         
@@ -584,7 +621,7 @@ class Router
         if (!isset($message)) $message = "Sorry, this page does not exist";
         
         if (self::getRequestFormat() !== 'html') {
-            self::outputError($http_code, $message);
+            self::outputError($http_code, $message, $this->getOutputFormat());
             exit();
         }
         
@@ -616,7 +653,7 @@ class Router
     protected function _error($error, $http_code=500)
     {
         if (self::getRequestFormat() !== 'html') {
-            self::outputError(500, $error);
+            self::outputError(500, $error, $this->getOutputFormat());
             return true;
         }
         
@@ -631,7 +668,7 @@ class Router
      * 
      * @param int           $http_code  HTTP status code
      * @param string|object $error
-     * @param string        $format     The request format (auto detect by default)
+     * @param string        $format     The output format (auto detect by default)
      */
     public static function outputError($http_code, $error, $format=null)
     {
@@ -659,7 +696,7 @@ class Router
             case 'png':
             case 'gif':
             case 'jpeg':
-                static::outputErrorImage($format, $error);
+                return static::outputErrorImage($format, $error);
         }
         
         echo is_scalar($error) ? $error : json_encode($error, JSON_PRETTY_PRINT);
@@ -668,7 +705,7 @@ class Router
     /**
      * Output error as json
      * 
-     * @param string        $format  'jpeg', 'png' or 'gif'
+     * @param string        $format  'json' or 'jsonp'
      * @param string|object $error   Message or object 
      */
     protected static function outputErrorJson($format, $error)
@@ -720,6 +757,8 @@ class Router
         imagefill($image, 0, 0, $black);
         imageline($image, 0, 0, 100, 100, $red);
         imageline($image, 0, 100, 100, 0, $red);
+
+        $out = 'image' . $format;
         
         if (is_scalar($error)) {
             header("X-Error: " . str_replace('\n', ' ', $error));
@@ -728,8 +767,6 @@ class Router
                 header("X-Error-" . ucfirst($key) . ": " . str_replace('\n', ' ', $value));
             }
         }
-        
-        $out = 'image' . $format;
         
         header("Content-Type: application/$format");
         $out($image);
