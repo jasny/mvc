@@ -87,6 +87,12 @@ class Router
      */
     protected $route;
 
+    /**
+     * The HTTP status to use by not found
+     * @var int
+     */
+    protected $httpStatus;
+    
     
     /**
      * Class constructor
@@ -377,28 +383,33 @@ class Router
      * 
      * @param string $method
      * @param string $url
-     * @return string
+     * @return string|int   < 0 means no route found
      */
     protected function findRoute($method, $url)
     {
         $this->getRoutes(); // Make sure the routes are initialised
+        $ret = -404;
         
         if ($url !== '/') $url = rtrim($url, '/');
         if (substr($url, 0, 2) == '/:') $url = substr($url, 2);
 
         foreach (array_keys($this->routes) as $route) {
-            if (strpos($route, ' ') !== false && preg_match('/^[A-Z]+\s/', $route)) {
-                list($route_method, $route_path) = preg_split('/\s+/', $route, 2);
-                if ($route_method !== $method) return;
-            } else {
-                $route_path = $route;
+            if (strpos($route, ' ') !== false && preg_match('/^([A-Z]+|\{[A-Z](,[A-Z])*\})\s/', $route)) {
+                list($rm, $path) = preg_split('/\s+/', $route, 2);
+                $route_methods = $rm[0] === '{' ? explode(',', substr($rm, 1, -1)) : [$rm];
+            }else {
+                $path = $route;
+                $route_methods = null;
             }
             
-            if ($route_path !== '/') $route_path = rtrim($route_path, '/');
-            if ($this->fnmatch($route_path, $url)) return $route;
+            if ($path !== '/') $path = rtrim($path, '/');
+            if ($this->fnmatch($path, $url)) {
+                if (!isset($route_methods) || in_array($method, $route_methods)) return $route;
+                $ret = -405;
+            }
         }
 
-        return false;
+        return $ret;
     }
 
     /**
@@ -419,11 +430,12 @@ class Router
 
         $match = $this->findRoute($method, $url);
 
-        if ($match) {
+        if (!is_int($match) || $match >= 0) {
             $this->route = $this->bind($this->routes[$match], $this->splitUrl($url));
             $this->route->route = $match;
         } else {
             $this->route = false;
+            $this->httpStatus = -1 * $match;
         }
 
         return $this->route;
@@ -485,10 +497,10 @@ class Router
         $method = $this->getActionMethod($route->action);
         $args = isset($route->args) ? $route->args : [];
 
-        if (!class_exists($class)) return $this->notFound();
+        if (!class_exists($class)) return false;
 
         $controller = new $class($this);
-        if (!is_callable([$controller, $method])) return $this->notFound();
+        if (!is_callable([$controller, $method])) return false;
 
         $ret = call_user_func_array([$controller, $method], $args);
         return isset($ret) ? $ret : true;
@@ -504,7 +516,7 @@ class Router
         $route = $this->getRoute();
         if ($route) $ret = $this->routeTo($route);
         
-        if (!isset($ret) || $ret === false) return $this->notFound();
+        if (!isset($ret) || $ret === false) return $this->notFound(null, $this->httpStatus ?: 404);
         return $ret;
     }
 
