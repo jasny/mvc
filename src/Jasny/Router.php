@@ -643,7 +643,9 @@ class Router
      */
     public function notFound($message=null, $http_code=404)
     {
-        if (!isset($message)) $message = "Sorry, this page does not exist";
+        if (!isset($message)) {
+            $message = $http_code === 405 ? "Sorry, this action isn't supported" : "Sorry, this page does not exist";
+        }
         
         if (self::getRequestFormat() !== 'html') {
             self::outputError($http_code, $message, $this->getOutputFormat());
