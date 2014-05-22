@@ -394,17 +394,18 @@ class Router
         if (substr($url, 0, 2) == '/:') $url = substr($url, 2);
 
         foreach (array_keys($this->routes) as $route) {
-            if (strpos($route, ' ') !== false && preg_match('/^([A-Z]+|\{[A-Z](,[A-Z])*\})\s/', $route)) {
-                list($rm, $path) = preg_split('/\s+/', $route, 2);
-                $route_methods = $rm[0] === '{' ? explode(',', substr($rm, 1, -1)) : [$rm];
+            if (strpos($route, ' ') !== false && preg_match_all('/\s+\+(\w+)\b|\s+\-(\w+)\b/', $route, $matches)) {
+                list($path) = preg_split('/\s+/', $route, 2);
+                $inc = isset($matches[1]) ? array_filter($matches[1]) : [];
+                $excl = isset($matches[2]) ? array_filter($matches[2]) : [];
             }else {
                 $path = $route;
-                $route_methods = null;
+                $inc = $excl = [];
             }
             
             if ($path !== '/') $path = rtrim($path, '/');
             if ($this->fnmatch($path, $url)) {
-                if (!isset($route_methods) || in_array($method, $route_methods)) return $route;
+                if ((empty($inc) || in_array($method, $inc)) && !in_array($method, $excl)) return $route;
                 $ret = -405;
             }
         }
