@@ -326,7 +326,7 @@ class Router
      */
     public function getUrl()
     {
-        if (!isset($this->url)) $this->url = preg_replace('/\?.*$/', '', $_SERVER['REQUEST_URI']);
+        if (!isset($this->url)) $this->url = urldecode(preg_replace('/\?.*$/', '', $_SERVER['REQUEST_URI']));
         return $this->url;
     }
 
