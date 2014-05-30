@@ -1,11 +1,13 @@
 <?php
 
-namespace Jasny;
+namespace Jasny\View;
+
+use Jasny\View;
 
 /**
  * View using Twig
  */
-class View_Twig extends View
+class Twig extends View
 {
     /** @var \Twig_Template */
     protected $template;
@@ -13,6 +15,12 @@ class View_Twig extends View
     /** @var \Twig_Environment */
     protected $env;
     
+    /**
+     * The output content type
+     * @var string
+     */
+    public $contentType = 'text/html';
+
     
     /** @var \Twig_Environment */
     protected static $environment;
@@ -50,7 +58,7 @@ class View_Twig extends View
      */
     public function display($context)
     {
-        header('Content-type: text/html; charset=utf-8');
+        header('Content-type: ' . $this->contentType . '; charset=' . $this->env->getCharset());
         $this->template->display($context);
     }
 
@@ -60,7 +68,7 @@ class View_Twig extends View
      * 
      * @param string $name   Variable name
      * @param mixed  $value
-     * @return View_Twig $this
+     * @return Twig $this
      */
     public function set($name, $value)
     {
@@ -73,11 +81,17 @@ class View_Twig extends View
      * 
      * @param string $function  Variable name
      * @param mixed  $callback
-     * @return View_Twig $this
+     * @param string $as        'function' or 'filter'
+     * @return Twig $this
      */
-    public function expose($function, $callback=null)
+    public function expose($function, $callback=null, $as='function')
     {
-        $this->env->addFunction(new \Twig_SimpleFunction($function, $callback ?: $function));
+        if ($as === 'function') {
+            $this->env->addFunction(new \Twig_SimpleFunction($function, $callback ?: $function));
+        } elseif ($as === 'filter') {
+            $this->env->addFilter(new \Twig_SimpleFilter('rot13', 'str_rot13'));
+        }
+        
         return $this;
     }
     

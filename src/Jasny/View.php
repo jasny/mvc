@@ -25,7 +25,7 @@ abstract class View
      * @var type 
      */
     public static $map = [
-        'twig' => 'Jasny\View_Twig'
+        'twig' => 'Jasny\View\Twig'
     ];
 
     /**
