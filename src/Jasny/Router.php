@@ -189,7 +189,7 @@ class Router
      * 
      * @return string  'html', 'json', 'xml', 'text', 'js', 'css', 'png', 'gif' or 'jpeg'
      */
-    public static function getRequestFormat()
+    public static function getAcceptFormat()
     {
         if (empty($_SERVER['HTTP_ACCEPT'])) return 'html';
         
@@ -238,6 +238,21 @@ class Router
             $_SERVER['HTTP_HOST'] ? $_SERVER['HTTP_REFERER'] : null;
     }
     
+    /**
+     * Get the request input data, decoded based on Content-Type header.
+     * 
+     * @return mixed
+     */
+    public static function getRequestData()
+    {
+        switch ($_SERVER['CONTENT_TYPE']) {
+            case 'application/x-www-form-urlencoded': return $_POST;
+            case 'multipart/formdata': return $_FILES + $_POST;
+            case 'application/json': return json_decode(file_get_contents('php://input'));
+            case 'application/xml': return simplexml_load_string(file_get_contents('php://input'));
+            default: return file_get_contents('php://input');
+        }
+    }
     
     /**
      * Set the method to route
@@ -363,7 +378,7 @@ class Router
      */
     public function getOutputFormat()
     {
-        if (!isset($this->format)) $this->format = self::getRequestFormat();
+        if (!isset($this->format)) $this->format = self::getAcceptFormat();
         return $this->format;
     }
     
@@ -590,7 +605,7 @@ class Router
      */
     public function badRequest($message, $http_code=400)
     {
-        if (self::getRequestFormat() !== 'html') {
+        if (self::getAcceptFormat() !== 'html') {
             self::outputError($http_code, $message, $this->getOutputFormat());
             exit();
         }
@@ -623,7 +638,7 @@ class Router
     {
         if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
         
-        if (self::getRequestFormat() !== 'html') {
+        if (self::getAcceptFormat() !== 'html') {
             self::outputError($http_code, $message, $this->getOutputFormat());
             exit();
         }
@@ -647,7 +662,7 @@ class Router
             $message = $http_code === 405 ? "Sorry, this action isn't supported" : "Sorry, this page does not exist";
         }
         
-        if (self::getRequestFormat() !== 'html') {
+        if (self::getAcceptFormat() !== 'html') {
             self::outputError($http_code, $message, $this->getOutputFormat());
             exit();
         }
@@ -679,7 +694,7 @@ class Router
      */
     protected function _error($error, $http_code=500)
     {
-        if (self::getRequestFormat() !== 'html') {
+        if (self::getAcceptFormat() !== 'html') {
             self::outputError(500, $error, $this->getOutputFormat());
             return true;
         }
@@ -701,7 +716,7 @@ class Router
     {
         if (ob_get_level() > 1) ob_end_clean();
         
-        if (!isset($format)) $format = static::isJsonpRequest() ? 'jsonp' : static::getRequestFormat();
+        if (!isset($format)) $format = static::isJsonpRequest() ? 'jsonp' : static::getAcceptFormat();
         
         if ($format !== 'jsonp') header(self::getProtocol() . ' ' . static::$httpStatusCodes[$http_code]);
         
@@ -775,7 +790,7 @@ class Router
      */
     protected static function outputErrorImage($format=null, $error=null)
     {
-        if (!isset($format)) $format = $this->getRequestFormat();
+        if (!isset($format)) $format = $this->getAcceptFormat();
         
         $image = imagecreate(100, 100);
         $black = imagecolorallocate($image, 0, 0, 0);

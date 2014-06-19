@@ -37,17 +37,6 @@ abstract class Controller
     }
     
     /**
-     * Check if we should output a specific format.
-     * Defaults to html.
-     * 
-     * @return string  'html', 'json', 'xml', 'text', 'js', 'css', 'png', 'gif' or 'jpeg'
-     */
-    protected function getRequestFormat()
-    {
-        return Router::getRequestFormat();
-    }
-
-    /**
      * Shortcut for REQUEST_METHOD === 'POST'
      * 
      * @return boolean
@@ -87,6 +76,27 @@ abstract class Controller
         return Router::getLocalReferer();
     }
     
+    /**
+     * Get the requested output format.
+     * Defaults to html.
+     * 
+     * @return string  'html', 'json', 'xml', 'text', 'js', 'css', 'png', 'gif' or 'jpeg'
+     */
+    protected function getOutputFormat()
+    {
+        return isset($this->router) ? $this->router->getOutputFormat() : Router::getAcceptFormat();
+    }
+    
+    /**
+     * Get the request input data, decoded based on Content-Type header.
+     * 
+     * @return mixed
+     */
+    protected function getInput()
+    {
+        return Router::getRequestData();
+    }
+    
     
     /**
      * Show a view.
@@ -97,7 +107,7 @@ abstract class Controller
     protected function view($name=null, $context=[])
     {
         if (!isset($name) && isset($this->router))
-            $name = $this->router()->get('controller') . '/' . $this->router()->get('action');
+            $name = $this->router->get('controller') . '/' . $this->router->get('action');
 
         View::load($name)
             ->set('current_route', $this->router->getRoute())
