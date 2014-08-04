@@ -19,6 +19,7 @@
     },
     "autoload": {
         "psr-0": {
+            "Jasny\\Request": "src/",
             "Jasny\\Router": "src/",
             "Jasny\\Controller": "src/",
             "Jasny\\View": "src/"

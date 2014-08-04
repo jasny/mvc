@@ -13,6 +13,17 @@ abstract class Controller
     protected $router;
 
     /**
+     * @var Request
+     */
+    protected $request;
+    
+    /**
+     * @var Flash
+     */
+    protected $flash;
+    
+    
+    /**
      * Class constructor
      * 
      * @param Router $router
@@ -20,50 +31,8 @@ abstract class Controller
     public function __construct($router=null)
     {
         $this->router = $router;
-    }
-    
-
-    /**
-     * Return the request method.
-     * 
-     * Usually $_SERVER['REQUEST_METHOD'], but this can be overwritten by $_POST['_method'].
-     * Method is alway uppercase.
-     * 
-     * @return string
-     */
-    public function getRequestMethod()
-    {
-        return Router::getRequestMethod();
-    }
-    
-    /**
-     * Shortcut for REQUEST_METHOD === 'POST'
-     * 
-     * @return boolean
-     */
-    public function isPostRequest()
-    {
-        return $this->getRequestMethod() === 'POST';
-    }
-    
-    /**
-     * Check if request is an AJAX request.
-     * 
-     * @return boolean
-     */
-    protected function isAjaxRequest()
-    {
-        return Router::isAjaxRequest();
-    }
-
-    /**
-     * Check if requested to wrap JSON as JSONP response.
-     * 
-     * @return boolean
-     */
-    protected function isJsonpRequest()
-    {
-        return Router::isJsonpRequest();
+        $this->request = new Request();
+        $this->flash = new Flash();
     }
     
     /**
@@ -73,28 +42,7 @@ abstract class Controller
      */
     protected function getLocalReferer()
     {
-        return Router::getLocalReferer();
-    }
-    
-    /**
-     * Get the requested output format.
-     * Defaults to html.
-     * 
-     * @return string  'html', 'json', 'xml', 'text', 'js', 'css', 'png', 'gif' or 'jpeg'
-     */
-    protected function getOutputFormat()
-    {
-        return isset($this->router) ? $this->router->getOutputFormat() : Router::getAcceptFormat();
-    }
-    
-    /**
-     * Get the request input data, decoded based on Content-Type header.
-     * 
-     * @return mixed
-     */
-    protected function getInput()
-    {
-        return Router::getRequestData();
+        return $this->request->getLocalReferer();
     }
     
     
@@ -107,31 +55,47 @@ abstract class Controller
     protected function view($name=null, $context=[])
     {
         if (!isset($name) && isset($this->router))
-            $name = $this->router->get('controller') . '/' . $this->router->get('action');
+            $name = $this->router()->get('controller') . '/' . $this->router()->get('action');
 
         View::load($name)
             ->set('current_route', $this->router->getRoute())
             ->display($context);
     }
     
+    
     /**
-     * Output result as JSON.
-     * Supports JSONP.
+     * Get the request input data, decoded based on Content-Type header.
      * 
-     * @param mixed $result
-     * @param int   $options  json_encode options
+     * @return mixed
      */
-    protected function outputJSON($result, $options=0)
+    protected function getInput()
     {
-        if ($this->isJsonpRequest()) {
-            header("Content-Type: application/javascript");
-            echo $_GET['callback'] . '(' . json_encode($result, $options) . ')';
-        } else {
-            header("Content-Type: application/json");
-            echo json_encode($result, $options);
-        }
+        return $this->request->getInput();
     }
-
+    
+    /**
+     * Set the headers with HTTP status code and content type.
+     * 
+     * @param int    $httpCode  HTTP status code (may be omitted)
+     * @param string $format    Mime or simple format
+     * @return Controller $this
+     */
+    protected function respondWith($httpCode, $format)
+    {
+        $this->request->respondWith($httpCode, $format);
+        return $this;
+    }
+    
+    /**
+     * Output data
+     * 
+     * @param array $data
+     */
+    protected function output($data)
+    {
+        $this->request->output($data);
+    }
+    
     
     /**
      * Redirect to previous page.
@@ -139,29 +103,24 @@ abstract class Controller
      */
     protected function back()
     {
-        $this->redirect(Router::getLocalReferer() ?: '/', 303);
+        $this->redirect($this->router->getLocalReferer() ?: '/', 303);
     }
     
     /**
      * Redirect to another page.
      * 
-     * @example return $this->redirect("somepage.php");
-     * 
      * @param string $url 
-     * @param int    $http_code  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
+     * @param int    $httpCode  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
      */
-    protected function redirect($url, $http_code=303)
+    protected function redirect($url, $httpCode=303)
     {
-        if ($this->router) return $this->router->redirect($url, $http_code);
-        
-        // Turn relative URL into absolute URL
-        if (strpos($url, '://') === false) {
-            if ($url == '' || $url[0] != '/') $url = dirname($_SERVER['REQUEST_URI']) . '/' . $url;
-            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . $url;
+        if ($this->router) {
+            $this->router->redirect($url, $httpCode);
+        } else {
+            $this->request->respondWith($httpCode, 'html');
+            header("Location: $url");
+            echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
         }
-
-        header("Location: $url", true, $http_code);
-        echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
         
         exit();
     }
@@ -171,12 +130,16 @@ abstract class Controller
      * Give a 400 Bad Request response
      * 
      * @param string $message
+     * @param int    $httpCode  HTTP status code
      */
-    protected function badRequest($message, $http_code=400)
+    protected function badRequest($message, $httpCode=400)
     {
-        if ($this->router) return $this->router->badRequest($message, $http_code);
+        if ($this->router) {
+            call_user_func_array([$this->router, 'forbidden'], func_get_args());
+        } else {
+            $this->request->outputError($httpCode, $message);
+        }
         
-        Router::outputHttpError($http_code, $message);
         exit();
     }
 
@@ -195,13 +158,17 @@ abstract class Controller
      * Give a 403 Forbidden response
      * 
      * @param string $message
+     * @param int    $httpCode  HTTP status code
      */
-    protected function forbidden($message=null, $http_code=403)
+    protected function forbidden($message=null, $httpCode=403)
     {
-        if ($this->router) return $this->router->forbidden($message, $http_code);
+        if ($this->router) {
+            call_user_func_array([$this->router, 'forbidden'], func_get_args());
+        } else {
+            if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
+            $this->request->outputError($httpCode, $message);
+        }
         
-        if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
-        Router::outputHttpError($http_code, $message);
         exit();
     }
 
@@ -209,13 +176,17 @@ abstract class Controller
      * Give a 404 Not Found response
      * 
      * @param string $message
+     * @param int    $httpCode  HTTP status code
      */
-    protected function notFound($message=null, $http_code=404)
+    protected function notFound($message=null, $httpCode=404)
     {
-        if ($this->router) return $this->router->notFound($message, $http_code);
-        
-        if (!isset($message)) $message = "Sorry, this page does not exist";
-        Router::outputHttpError($http_code, $message);
+        if ($this->router) {
+            call_user_func_array([$this->router, 'notFound'], func_get_args());
+        } else {
+            if (!isset($message)) $message = "Sorry, this page does not exist";
+            $this->request->outputError($httpCode, $message);
+        }
+
         exit();
     }
     
@@ -223,42 +194,17 @@ abstract class Controller
      * Give a 500 Internal Server Error response and exit
      * 
      * @param string $message
-     * @param int    $http_code  Alternative HTTP status code
+     * @param int    $httpCode  HTTP status code
      * @return boolean
      */
-    public function error($message, $http_code=500)
+    public function error($message, $httpCode=500)
     {
-        if ($this->router) return $this->router->error($message, $http_code);
+        if ($this->router) {
+            call_user_func_array([$this->router, 'error'], func_get_args());
+        } else {
+            $this->request->outputError($httpCode, $message);
+        }
         
-        Router::outputHttpError($http_code, $message);
         exit();
-    }
-    
-    
-    /**
-     * Set flash message.
-     * 
-     * @param mixed $type     flash type, eg. 'error', 'notice' or 'success'
-     * @param mixed $message  flash message
-     */
-    public static function setFlash($type, $message)
-    {
-        $_SESSION['flash'] = ['type'=>$type, 'message'=>$message];
-    }
-    
-    /**
-     * Get the flash message.
-     */
-    public static function getFlash()
-    {
-        unset($_SESSION['flash']);
-    }
-    
-    /**
-     * Clear the flash message.
-     */
-    public static function clearFlash()
-    {
-        unset($_SESSION['flash']);
     }
 }

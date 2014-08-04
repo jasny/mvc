@@ -19,39 +19,6 @@ namespace Jasny;
 class Router
 {
     /**
-     * HTTP status codes
-     * @var array
-     */
-    static public $httpStatusCodes = [
-        200 => '200 OK',
-        201 => '201 Created',
-        202 => '202 Accepted',
-        204 => '204 No Content',
-        205 => '205 Reset Content',
-        206 => '206 Partial Content',
-        301 => '301 Moved Permanently',
-        302 => '302 Found',
-        303 => '303 See Other',
-        304 => '304 Not Modified',
-        307 => '307 Temporary Redirect',
-        308 => '308 Permanent Redirect',
-        400 => "400 Bad Request",
-        401 => "401 Unauthorized",
-        402 => "402 Payment Required",
-        403 => "403 Forbidden",
-        404 => "404 Not Found",
-        405 => "405 Method Not Allowed",
-        406 => "406 Not Acceptable",
-        409 => "409 Conflict",
-        410 => "410 Gone",
-        415 => "415 Unsupported Media Type",
-        429 => "429 Too Many Requests",
-        500 => "500 Internal server error",
-        501 => "501 Not Implemented",
-        503 => "503 Service unavailable"
-    ];
-    
-    /**
      * Specific routes
      * @var array 
      */
@@ -76,12 +43,6 @@ class Router
     protected $url;
 
     /**
-     * Output format
-     * @var string 
-     */
-    protected $format;
-
-    /**
      * Variables from matched route (cached)
      * @var object 
      */
@@ -92,6 +53,19 @@ class Router
      * @var int
      */
     protected $httpStatus;
+    
+    
+    /**
+     * The chained error handler
+     * @var callback
+     */
+    protected $prevErrorHandler;
+    
+    /**
+     * The chained exception handler
+     * @var callback
+     */
+    protected $prevExceptionHandler;
     
     
     /**
@@ -161,100 +135,6 @@ class Router
 
     
     /**
-     * Get the HTTP protocol
-     * 
-     * @return string;
-     */
-    protected static function getProtocol()
-    {
-        return isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1';
-    }
-    
-    /**
-     * Return the request method.
-     * 
-     * Usually REQUEST_METHOD, but this can be overwritten by $_POST['_method'].
-     * Method is alway uppercase.
-     * 
-     * @return string
-     */
-    public static function getRequestMethod()
-    {
-        return strtoupper(!empty($_POST['_method']) ? $_POST['_method'] : $_SERVER['REQUEST_METHOD']);
-    }
-    
-    /**
-     * Check if we should output a specific format.
-     * Defaults to 'html'.
-     * 
-     * @return string  'html', 'json', 'xml', 'text', 'js', 'css', 'png', 'gif' or 'jpeg'
-     */
-    public static function getAcceptFormat()
-    {
-        if (empty($_SERVER['HTTP_ACCEPT'])) return 'html';
-        
-        if (preg_match('~^application/json\b~', $_SERVER['HTTP_ACCEPT'])) return 'json';
-        if (preg_match('~^application/javascript\b~', $_SERVER['HTTP_ACCEPT']))
-            return !empty($_GET['callback']) ? 'json' : 'js';
-        
-        if (preg_match('~^text/xml\b~', $_SERVER['HTTP_ACCEPT'])) return 'xml';
-        if (preg_match('~^text/plain\b~', $_SERVER['HTTP_ACCEPT'])) return 'text';
-        if (preg_match('~^text/css\b~', $_SERVER['HTTP_ACCEPT'])) return 'css';
-        
-        if (preg_match('~^image/(\w+)\b~', $_SERVER['HTTP_ACCEPT'], $match)) return $match[1];
-        
-        return 'html';
-    }
-    
-    /**
-     * Check if request is an AJAX request.
-     * 
-     * @return boolean
-     */
-    public static function isAjaxRequest()
-    {
-        return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
-            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-    }
-
-    /**
-     * Check if requested to wrap JSON as JSONP response.
-     * 
-     * @return boolean
-     */
-    public static function isJsonpRequest()
-    {
-        return preg_match('~^application/javascript\b~', $_SERVER['HTTP_ACCEPT']) && !empty($_GET['callback']);
-    }
-    
-    /**
-     * Returns the HTTP referer if it is on the current host.
-     * 
-     * @return string
-     */
-    public static function getLocalReferer()
-    {
-        return !empty($_SERVER['HTTP_REFERER']) && parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST) ==
-            $_SERVER['HTTP_HOST'] ? $_SERVER['HTTP_REFERER'] : null;
-    }
-    
-    /**
-     * Get the request input data, decoded based on Content-Type header.
-     * 
-     * @return mixed
-     */
-    public static function getRequestData()
-    {
-        switch ($_SERVER['CONTENT_TYPE']) {
-            case 'application/x-www-form-urlencoded': return $_POST;
-            case 'multipart/formdata': return $_FILES + $_POST;
-            case 'application/json': return json_decode(file_get_contents('php://input'));
-            case 'application/xml': return simplexml_load_string(file_get_contents('php://input'));
-            default: return file_get_contents('php://input');
-        }
-    }
-    
-    /**
      * Set the method to route
      * 
      * @param string $method
@@ -276,10 +156,7 @@ class Router
      */
     public function getMethod()
     {
-        if (!isset($this->method)) {
-            $this->method = strtoupper(!empty($_POST['_method']) ? $_POST['_method'] : $_SERVER['REQUEST_METHOD']);
-        }
-        
+        if (!isset($this->method)) $this->method = Request::getMethod();
         return $this->method;
     }
     
@@ -359,31 +236,6 @@ class Router
     
     
     /**
-     * Set the output format for messages.
-     * 
-     * @param string $format  'html', 'json', 'jsonp', 'xml', 'text', 'js', 'css', 'png', 'gif' or 'jpeg'
-     * @return Router
-     */
-    public function setOutputFormat($format)
-    {
-        $this->format = $format;
-        return $this;
-    }
-
-    /**
-     * Get the output format for messages.
-     * Determines it from ACCEPT header by default.
-     * 
-     * @return string
-     */
-    public function getOutputFormat()
-    {
-        if (!isset($this->format)) $this->format = self::getAcceptFormat();
-        return $this->format;
-    }
-    
-    
-    /**
      * Check if the router has been used.
      * 
      * @return boolean
@@ -413,7 +265,7 @@ class Router
                 list($path) = preg_split('/\s+/', $route, 2);
                 $inc = isset($matches[1]) ? array_filter($matches[1]) : [];
                 $excl = isset($matches[2]) ? array_filter($matches[2]) : [];
-            }else {
+            } else {
                 $path = $route;
                 $inc = $excl = [];
             }
@@ -539,29 +391,40 @@ class Router
     
     /**
      * Enable router to handle fatal errors.
+     * 
+     * @param boolean $callPrevious  Call previous error handler
      */
-    public function handleErrors()
+    public function handleErrors($callPrevious = true)
     {
-        set_error_handler(array($this, 'onError'), E_RECOVERABLE_ERROR | E_USER_ERROR);
-        set_exception_handler(array($this, 'onException'));
+        $prevErrorHandler = set_error_handler(array($this, 'onError'));
+        $prevExceptionHandler = set_exception_handler(array($this, 'onException'));
+        
+        if ($callPrevious) {
+            $this->prevErrorHandler = $prevErrorHandler;
+            $this->prevExceptionHandler = $prevExceptionHandler;
+        }
     }
     
     /**
      * Error handler callback
      * 
-     * @param int    $errno
-     * @param string $errstr
-     * @param string $errfile
-     * @param int    $errline
-     * @param array  $errcontext
+     * @param int    $code
+     * @param string $message
+     * @param string $file
+     * @param int    $line
+     * @param array  $context
      * @return boolean
      */
-    public function onError($errno, $errstr, $errfile, $errline, $errcontext)
+    public function onError($code, $message, $file, $line, $context)
     {
-        if (!(error_reporting() & $errno)) return null;
+        if ($this->prevErrorHandler) {
+            call_user_func($this->prevErrorHandler, $code, $message, $file, $line, $context);
+        }
         
-        $args = get_defined_vars();
-        return $this->_error($args);
+        if ($code & (E_RECOVERABLE_ERROR | E_USER_ERROR)) {
+            $error = get_defined_vars();
+            $this->error(null, 500, $error);
+        }
     }
 
     /**
@@ -572,7 +435,9 @@ class Router
      */
     public function onException($exception)
     {
-        return $this->_error($exception);
+        if ($this->prevExceptionHandler) call_user_func($this->prevExceptionHandler, $exception);
+        
+        $this->error(null, 500, $exception);
     }
     
 
@@ -580,18 +445,16 @@ class Router
      * Redirect to another page and exit
      * 
      * @param string $url 
-     * @param int    $http_code  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
+     * @param int    $httpCode  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
      */
-    public function redirect($url, $http_code=303)
+    public function redirect($url, $httpCode=303)
     {
-        // Turn relative URL into absolute URL
-        if (strpos($url, '://') === false) {
-            if ($url == '' || $url[0] != '/') $url = dirname($_SERVER['REQUEST_URI']) . '/' . $url;
-            $url = (empty($_SERVER['HTTPS']) ? 'http://' : 'https://') . $_SERVER['HTTP_HOST'] . $this->rebase($url);
-        }
-
         if (ob_get_level() > 1) ob_end_clean();
-        header("Location: $url", true, $http_code);
+        
+        if ($url[0] === '/' && substr($url, 0, 2) !== '//') $url = $this->rebase($url);
+        
+        Request::respondWith($httpCode, 'html');
+        header("Location: $url");
         
         echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
         exit();
@@ -601,25 +464,17 @@ class Router
      * Give a 400 Bad Request response and exit
      * 
      * @param string $message
-     * @param int    $http_code  Alternative HTTP status code, eg. 406 (Not Acceptable)
+     * @param int    $httpCode  Alternative HTTP status code, eg. 406 (Not Acceptable)
+     * @param mixed  $..        Additional arguments are passed to action        
      */
-    public function badRequest($message, $http_code=400)
+    public function badRequest($message, $httpCode=400)
     {
-        if (self::getAcceptFormat() !== 'html') {
-            self::outputError($http_code, $message, $this->getOutputFormat());
-            exit();
-        }
-        
-        if (ob_get_level() > 1) ob_end_clean();
-        header(self::getProtocol() . ' '. static::$httpStatusCodes[$http_code]);
-        
-        if (!$this->routeTo(400, ['args'=>[$http_code, $message]])) echo $message;
+        $this->respond(400, $message, $httpCode, array_slice(func_get_args(), 2));        
         exit();
     }
 
     /**
      * Route to 401, otherwise result in a 403 forbidden.
-     * 
      * Note: While the 401 route is used, we don't respond with a 401 http status code.
      */
     public function requireLogin()
@@ -632,21 +487,18 @@ class Router
      * Give a 403 Forbidden response and exit
      * 
      * @param string $message
-     * @param int    $http_code  Alternative HTTP status code
+     * @param int    $httpCode  Alternative HTTP status code
+     * @param mixed  $..        Additional arguments are passed to action        
      */
-    public function forbidden($message=null, $http_code=403)
+    public function forbidden($message=null, $httpCode=403)
     {
-        if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
+        if (ob_get_level() > 1) ob_end_clean();
         
-        if (self::getAcceptFormat() !== 'html') {
-            self::outputError($http_code, $message, $this->getOutputFormat());
-            exit();
+        if (!$this->routeTo(403, ['args'=>func_get_args()])) {
+            if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
+            self::outputError($httpCode, $message, $this->getOutputFormat());
         }
         
-        if (ob_get_level() > 1) ob_end_clean();
-        header(self::getProtocol() . ' ' . static::$httpStatusCodes[$http_code]);
-        
-        if (!$this->routeTo(403, ['args'=>[$http_code, $message]])) echo $message;
         exit();
     }
     
@@ -654,23 +506,21 @@ class Router
      * Give a 404 Not Found response and exit
      * 
      * @param string $message
-     * @param int    $http_code  Alternative HTTP status code, eg. 410 (Gone)
+     * @param int    $httpCode  Alternative HTTP status code, eg. 410 (Gone)
+     * @param mixed  $..        Additional arguments are passed to action        
      */
-    public function notFound($message=null, $http_code=404)
+    public function notFound($message=null, $httpCode=404)
     {
-        if (!isset($message)) {
-            $message = $http_code === 405 ? "Sorry, this action isn't supported" : "Sorry, this page does not exist";
-        }
-        
-        if (self::getAcceptFormat() !== 'html') {
-            self::outputError($http_code, $message, $this->getOutputFormat());
-            exit();
-        }
-        
         if (ob_get_level() > 1) ob_end_clean();
-        header(self::getProtocol() . ' ' . static::$httpStatusCodes[$http_code]);
+
+        if (!$this->routeTo(404, ['args'=>func_get_args()])) {
+            if (!isset($message)) $message = $httpCode === 405 ?
+                "Sorry, this action isn't supported" :
+                "Sorry, this page does not exist";
+            
+            self::outputError($httpCode, $message, $this->getOutputFormat());
+        }
         
-        if (!$this->routeTo(404, ['args'=>[$http_code, $message]])) echo $message;
         exit();
     }
 
@@ -678,140 +528,20 @@ class Router
      * Give a 500 Internal Server Error response and exit
      * 
      * @param string $message
-     * @param int    $http_code  Alternative HTTP status code
+     * @param int    $httpCode  Alternative HTTP status code, eg. 503 (Service unavailable)
+     * @param mixed  $..        Additional arguments are passed to action        
      * @return boolean
      */
-    public function error($message, $http_code=500)
-    {
-        if (!$this->_error($message, $http_code)) echo $message;
-    }
-    
-    /**
-     * Give a 500 Internal Server Error response
-     * 
-     * @param string|array|\Exception $error
-     * @return boolean
-     */
-    protected function _error($error, $http_code=500)
-    {
-        if (self::getAcceptFormat() !== 'html') {
-            self::outputError(500, $error, $this->getOutputFormat());
-            return true;
-        }
-        
-        if (ob_get_level() > 1) ob_end_clean();
-        header(self::getProtocol() . ' ' . static::$httpStatusCodes[$http_code]);
-        return (boolean)$this->routeTo(500, ['args'=>[500, $error]]);
-    }
-    
-    
-    /**
-     * Output an HTTP error
-     * 
-     * @param int           $http_code  HTTP status code
-     * @param string|object $error
-     * @param string        $format     The output format (auto detect by default)
-     */
-    public static function outputError($http_code, $error, $format=null)
+    protected function error($message=null, $httpCode=500)
     {
         if (ob_get_level() > 1) ob_end_clean();
         
-        if (!isset($format)) $format = static::isJsonpRequest() ? 'jsonp' : static::getAcceptFormat();
-        
-        if ($format !== 'jsonp') header(self::getProtocol() . ' ' . static::$httpStatusCodes[$http_code]);
-        
-        if ($error instanceof \Exception) {
-            $error = (object)[
-                'code' => $error->getCode(),
-                'message' => $error->getMessage()
-            ];
+        if (!$this->routeTo(500, ['args'=>func_get_args()])) {
+            if (!isset($message)) $message = "Sorry, an unexpected error occured";
+            self::outputError($httpCode, $message, $this->getOutputFormat());
         }
         
-        switch ($format) {
-            case 'json':
-            case 'jsonp':
-                return static::outputErrorJson($format, $error);
-                
-            case 'xml':
-                return static::outputErrorXml($error);
-            
-            case 'png':
-            case 'gif':
-            case 'jpeg':
-                return static::outputErrorImage($format, $error);
-        }
-        
-        echo is_scalar($error) ? $error : json_encode($error, JSON_PRETTY_PRINT);
-    }
-    
-    /**
-     * Output error as json
-     * 
-     * @param string        $format  'json' or 'jsonp'
-     * @param string|object $error   Message or object 
-     */
-    protected static function outputErrorJson($format, $error)
-    {
-        if (strtolower($format) === 'jsonp') {
-            header("Content-Type: application/javascript");
-            echo $_GET['callback'] . '(' . json_encode(compact('http_code', 'error')) . ')';
-        } else {
-            header("Content-Type: application/json");
-            echo json_encode($error);
-        }
-    }
-    
-    /**
-     * Output error as json
-     * 
-     * @param string        $format  'jpeg', 'png' or 'gif'
-     * @param string|object $error   Message or object 
-     */
-    public static function outputErrorXml($error)
-    {
-        header('Content-Type: text/xml');
-        if (is_scalar($error)) {
-            echo '<error>' . htmlspecialchars($error) . '</error>';
-        } else {
-            echo '<error>';
-            foreach ($error as $key => $value) {
-                echo "<$key>" . htmlspecialchars($value) . "</$key>";
-            }
-            echo '</error>';
-        }
-        return;
-    }
-    
-    /**
-     * Output an error image
-     * 
-     * @param string        $format  'jpeg', 'png' or 'gif'
-     * @param string|object $error   Message or object 
-     */
-    protected static function outputErrorImage($format=null, $error=null)
-    {
-        if (!isset($format)) $format = $this->getAcceptFormat();
-        
-        $image = imagecreate(100, 100);
-        $black = imagecolorallocate($image, 0, 0, 0);
-        $red = imagecolorallocate($image, 255, 0, 0);
-        
-        imagefill($image, 0, 0, $black);
-        imageline($image, 0, 0, 100, 100, $red);
-        imageline($image, 0, 100, 100, 0, $red);
-
-        $out = 'image' . $format;
-        
-        if (is_scalar($error)) {
-            header("X-Error: " . str_replace('\n', ' ', $error));
-        } elseif (isset($error)) {
-            foreach ($error as $key => $value) {
-                header("X-Error-" . ucfirst($key) . ": " . str_replace('\n', ' ', $value));
-            }
-        }
-        
-        header("Content-Type: application/$format");
-        $out($image);
+        exit();
     }
     
     
@@ -856,8 +586,10 @@ class Router
      */
     protected static function bind($vars, array $parts)
     {
-        $pos = 0;
-        foreach ($vars as $key => &$var) {
+        $values = [];
+        $type = is_array($vars) || is_int(reset($vars)) ? 'numeric' : 'assoc';
+
+        foreach ($vars as $key=>$var) {
             if (!isset($var)) continue;
             
             if (!is_scalar($var)) {
@@ -866,45 +598,58 @@ class Router
             }
 
             $options = preg_split('/(?<!\\\\)\|/', $var);
-            $var = null;
-
-            $replace_fn = function($match) use ($parts) {
-                $i = $match[1];
-                $i = $i > 0 ? $i - 1 : count($parts) - $i;
-                return $parts[$i];
-            };
+            $part = static::bindVar($parts, $options);
             
-            foreach ($options as $option) {
-                if ($option[0] === '$') {
-                    $i = (int)substr($option, 1);
-                    if ($i > 0) $i--;
-
-                    $slice = array_slice($parts, $i);
-
-                    if (substr($option, -1, 1) != '+') {
-                        if (!empty($slice)) $var = array_slice($parts, $i)[0];
-                    } elseif (!is_array($vars) || is_string($key)) {
-                        trigger_error("Binding multiple parts using \$+, like '$option', "
-                                . "are only allow in (numeric) arrays", E_USER_WARING);
-                        $var = null;
-                    } else {
-                        array_splice($vars, $pos, 1, $slice);
-                        $pos += count($slice) - 1;
-                    }
-                } else {
-                    $var = preg_replace_callback('/(?<!\\\\)\$(\d+)/', $replace_fn, $option);
-                }
-
-                if (!empty($var)) break; // continues if option can't be used
+            if ($type === 'assoc') {
+                $values[$key] = $part[0];
+            } else {
+                $values = array_merge($values, $part);
             }
-
-            $pos++;
         }
-        unset($var);
         
         return $vars;
     }
+    
+    /**
+     * Bind variable
+     * 
+     * @param string $type     'assoc or 'numeric'
+     * @param array  $parts
+     * @param array  $options
+     * @return array
+     */
+    protected static function bindVar($type, array $parts, array $options)
+    {
+        foreach ($options as $option) {
+            // Normal string
+            if ($option[0] !== '$') return [stripcslashes($option, '$')];
+            
+            // Super global
+            if (preg_match('/^(\$_(GET|POST|COOKIE))\[([^\[]*)\]$/i', $options, $matches)) {
+                return [${$matches[1]}[$matches[2]]];
+            }
 
+            $i = (int)substr($options, 1);
+
+            // Multiple parts
+            if (substr($option, -1, 1) === '+') {
+                if ($type === 'assoc') {
+                    trigger_error("Binding multiple parts using '$option'"
+                        . " is only allowed in numeric arrays", E_USER_WARNING);
+                    return [null];
+                }
+
+                return array_slice($parts, $i);
+            }
+            
+            // Single part
+            $part = array_slice($parts, $i, 1);
+            if (!empty($part)) return $part;
+        }
+        
+        return [null];
+    }
+    
     
     /**
      * Get the class name of the controller
@@ -936,6 +681,6 @@ class Router
      */
     protected static function camelcase($string)
     {
-        return strtr(ucwords(strtr($string, '_-', '  ')), [' '=>'']);
-    }    
+        return strtr(ucwords(strtr($string, '_-', '  ')), [' ' => '']);
+    }
 }

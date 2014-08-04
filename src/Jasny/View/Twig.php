@@ -3,6 +3,7 @@
 namespace Jasny\View;
 
 use Jasny\View;
+use Jasny\Flash;
 
 /**
  * View using Twig
@@ -106,8 +107,6 @@ class Twig extends View
      */
     public static function init($path=null, $cache=false)
     {
-        if (View::using() == null) View::using('twig');
-        
         if (!isset($path)) $path = getcwd();
         
         $loader = new \Twig_Loader_Filesystem($path);
@@ -117,7 +116,7 @@ class Twig extends View
         $twig->setCache($cache);
         
         // Add filters and extensions http://twig.sensiolabs.org/doc/api.html#using-extensions
-        $twig->addFunction(new \Twig_SimpleFunction('useFlash', [__CLASS__, 'useFlash']));
+        $twig->addGlobal('flash', new Flash());
         
         if (class_exists('Jasny\Twig\DateExtension')) $twig->addExtension(new \Jasny\Twig\DateExtension());
         if (class_exists('Jasny\Twig\PcreExtension')) $twig->addExtension(new \Jasny\Twig\PcreExtension());

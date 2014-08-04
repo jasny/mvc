@@ -36,13 +36,6 @@ abstract class View
     
     
     /**
-     * Class constructor
-     * 
-     * @param string $name  Template filename
-     */
-    abstract public function __construct($name);
-
-    /**
      * Render the template
      * 
      * @param array $context
@@ -135,20 +128,5 @@ abstract class View
     {
         $class = static::getClass();
         return call_user_func([$class, 'exists'], $name);
-    }
-    
-    /**
-     * Use the flash message
-     * 
-     * @return array
-     */
-    public static function useFlash()
-    {
-        if (isset($_SESSION['flash'])) {
-            self::$flash = $_SESSION['flash'];
-            unset($_SESSION['flash']);
-        }
-        
-        return self::$flash;
     }
 }
