@@ -1,6 +1,6 @@
 <?php
 
-namespace Jasny;
+namespace Jasny\MVC;
 
 /**
  * Class for the flash message

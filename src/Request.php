@@ -1,6 +1,6 @@
 <?php
 
-namespace Jasny;
+namespace Jasny\MVC;
 
 /**
  * Static class for the current HTTP request.

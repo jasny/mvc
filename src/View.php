@@ -1,6 +1,6 @@
 <?php
 
-namespace Jasny;
+namespace Jasny\MVC;
 
 /**
  * Base class for view loaders.

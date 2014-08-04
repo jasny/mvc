@@ -18,11 +18,8 @@
         "php": ">=5.4.0"
     },
     "autoload": {
-        "psr-0": {
-            "Jasny\\Request": "src/",
-            "Jasny\\Router": "src/",
-            "Jasny\\Controller": "src/",
-            "Jasny\\View": "src/"
+        "psr-4": {
+            "Jasny\\MVC": "src/"
         }
     }
 }
