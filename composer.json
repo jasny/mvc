@@ -1,7 +1,7 @@
 {
     "name": "jasny/mvc",
     "description": "The basics for an MVC application",
-    "keywords": ["MVC"],
+    "keywords": ["MVC", "controller", "routing", "router"],
     "license": "MIT",
     "authors": [
         {
@@ -19,7 +19,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Jasny\\MVC": "src/"
+            "Jasny\\MVC\\": "src/"
         }
     }
 }
