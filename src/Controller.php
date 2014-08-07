@@ -81,7 +81,7 @@ abstract class Controller
      * @param string $format    Mime or simple format
      * @return Controller $this
      */
-    protected function respondWith($httpCode, $format)
+    protected function respondWith($httpCode, $format=null)
     {
         $this->request->respondWith($httpCode, $format);
         return $this;

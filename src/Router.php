@@ -417,13 +417,17 @@ class Router
      */
     public function onError($code, $message, $file, $line, $context)
     {
+        if ($code & (E_RECOVERABLE_ERROR | E_USER_ERROR)) {
+            $error = get_defined_vars();
+            $this->displayError(null, 500, $error);
+        }
+        
         if ($this->prevErrorHandler) {
-            call_user_func($this->prevErrorHandler, $code, $message, $file, $line, $context);
+            //call_user_func($this->prevErrorHandler, $code, $message, $file, $line, $context);
         }
         
         if ($code & (E_RECOVERABLE_ERROR | E_USER_ERROR)) {
-            $error = get_defined_vars();
-            $this->error(null, 500, $error);
+            exit();
         }
     }
 
@@ -530,9 +534,21 @@ class Router
      * @param string $message
      * @param int    $httpCode  Alternative HTTP status code, eg. 503 (Service unavailable)
      * @param mixed  $..        Additional arguments are passed to action        
-     * @return boolean
      */
     protected function error($message=null, $httpCode=500)
+    {
+        call_user_func_array([$this, 'displayError'], func_get_args());
+        exit();
+    }
+    
+    /**
+     * Give a 500 Internal Server Error response (but don't exit)
+     * 
+     * @param string $message
+     * @param int    $httpCode  Alternative HTTP status code, eg. 503 (Service unavailable)
+     * @param mixed  $..        Additional arguments are passed to action        
+     */
+    protected function displayError($message=null, $httpCode=500)
     {
         if (ob_get_level() > 1) ob_end_clean();
         
@@ -540,8 +556,6 @@ class Router
             if (!isset($message)) $message = "Sorry, an unexpected error occured";
             self::outputError($httpCode, $message, $this->getOutputFormat());
         }
-        
-        exit();
     }
     
     
@@ -593,12 +607,17 @@ class Router
             if (!isset($var)) continue;
             
             if (!is_scalar($var)) {
-                $var = static::bind($var, $parts);
-                continue;
+                $part = array(static::bind($var, $parts));
+            } elseif ($var[0] === '$') {
+                $options = array_map('trim', explode('|', $var));
+                $part = static::bindVar($type, $parts, $options);
+            } elseif ($var[0] === '~' && substr($var, -1) === '~') {
+                $pieces = array_map('trim', explode('~', substr($var, 1, -2)));
+                $bound = array_filter(static::bind($pieces, $parts));
+                $part = array(join('', $bound));
+            } else {
+                $part = array($var);
             }
-
-            $options = preg_split('/(?<!\\\\)\|/', $var);
-            $part = static::bindVar($parts, $options);
             
             if ($type === 'assoc') {
                 $values[$key] = $part[0];
@@ -606,8 +625,9 @@ class Router
                 $values = array_merge($values, $part);
             }
         }
-        
-        return $vars;
+
+        if ($type === 'assoc') $values = (object)$values;
+        return $values;
     }
     
     /**
@@ -622,32 +642,39 @@ class Router
     {
         foreach ($options as $option) {
             // Normal string
-            if ($option[0] !== '$') return [stripcslashes($option, '$')];
-            
+            if ($option[0] !== '$') return [$option];
+
             // Super global
-            if (preg_match('/^(\$_(GET|POST|COOKIE))\[([^\[]*)\]$/i', $options, $matches)) {
-                return [${$matches[1]}[$matches[2]]];
+            if (preg_match('/^(\$_(GET|POST|COOKIE|ENV))\[([^\[]*)\]$/i', $option, $matches)) {
+                if (isset(${$matches[1]}[$matches[2]])) return array(${$matches[1]}[$matches[2]]);
+                continue;
             }
 
-            $i = (int)substr($options, 1);
-
+            // Request header
+            if (preg_match('/^\$([A-Z_]+)$/', $option, $matches)) {
+                if (isset($_SERVER[$matches[1]])) return array($_SERVER[$matches[1]]);
+                continue;
+            }
+            
+            $i = (int)substr($option, 1);
+            
             // Multiple parts
-            if (substr($option, -1, 1) === '+') {
+            if (substr($option, -3) === '...') {
                 if ($type === 'assoc') {
                     trigger_error("Binding multiple parts using '$option'"
                         . " is only allowed in numeric arrays", E_USER_WARNING);
-                    return [null];
+                    return array(null);
                 }
 
-                return array_slice($parts, $i);
+                return array_slice($parts, $i-1);
             }
             
             // Single part
-            $part = array_slice($parts, $i, 1);
+            $part = array_slice($parts, $i-1, 1);
             if (!empty($part)) return $part;
         }
         
-        return [null];
+        return array(null);
     }
     
     

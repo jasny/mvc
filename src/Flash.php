@@ -15,8 +15,10 @@ class Flash
     
     /**
      * Check if the flash is set.
+     * 
+     * @return boolean
      */
-    public static function exists()
+    public static function isIssued()
     {
         return isset($_SESSION['flash']) || isset(static::$data);
     }

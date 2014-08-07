@@ -1,9 +1,9 @@
 <?php
 
-namespace Jasny\MCV\View;
+namespace Jasny\MVC\View;
 
-use Jasny\MCV\View;
-use Jasny\MCV\Flash;
+use Jasny\MVC\View;
+use Jasny\MVC\Flash;
 
 /**
  * View using Twig

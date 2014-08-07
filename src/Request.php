@@ -55,11 +55,19 @@ class Request
         'image/png' => 'png',
         'image/gif' => 'gif',
         'image/jpeg' => 'jpeg',
+        'image/x-icon' => 'ico',
         'application/x-www-form-urlencoded' => 'post',
-        'multipart/form-data' => 'post',
-        '*/*' => 'html'
+        'multipart/form-data' => 'post'
     ];
     
+    /**
+     * File extensions to format mapping
+     * @var array
+     */
+    static public $fileExtension = [
+        'jpg' => 'jpeg',
+        'txt' => 'text'
+    ];
     
     /**
      * Get the HTTP protocol
@@ -127,6 +135,7 @@ class Request
      */
     public static function getOutputFormat($as='short')
     {
+        // Explicitly set as Content-Type response header
         foreach (headers_list() as $header) {
             if (strpos($header, 'Content-Type:') === 0) {
                 $mime = trim(explode(';', substr($header, 13))[0]);
@@ -134,16 +143,29 @@ class Request
             }
         }
         
+        // Accept request header
         if (!isset($mime) && !empty($_SERVER['HTTP_ACCEPT'])) {
-            $mime = trim(explode(';', $_SERVER['HTTP_ACCEPT'])[0]);
+            $mime = trim(explode(',', $_SERVER['HTTP_ACCEPT'])[0]);
         }
         
         if (!isset($mime)) $mime = '*/*';
         if ($mime === 'application/javascript' && !empty($_GET['callback'])) $mime = 'application/json';
         
-        return $as !== 'mime' && isset(static::$contentFormats[$mime]) ?
-            static::$contentFormats[$mime] :
-            $mime;
+        if ($mime !== '*/*') {
+            return $as === 'mime' || !isset(static::$contentFormats[$mime]) ?
+                $mime : static::$contentFormats[$mime];
+        }
+        
+        // File extension
+        $ext = pathinfo(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), PATHINFO_EXTENSION);
+        if ($ext) {
+            if (isset(static::$fileExtension[$ext])) $ext = static::$fileExtension[$ext];
+            if ($as === 'mime') return $ext;
+            return array_search($ext, static::$contentFormats) ?: $ext;
+        }
+        
+        // Don't know (default to HTML)
+        return $as === 'mime' ? '*/*' : 'html';
     }
     
     /**
