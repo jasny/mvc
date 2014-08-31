@@ -224,7 +224,8 @@ class Router
      */
     public static function isJsonpRequest()
     {
-        return preg_match('~^application/javascript\b~', $_SERVER['HTTP_ACCEPT']) && !empty($_GET['callback']);
+        return !empty($_SERVER['HTTP_ACCEPT']) && 
+            preg_match('~^application/javascript\b~', $_SERVER['HTTP_ACCEPT']) && !empty($_GET['callback']);
     }
     
     /**
