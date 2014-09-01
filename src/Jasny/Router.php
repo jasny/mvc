@@ -354,7 +354,7 @@ class Router
     public function getUrlPart($i)
     {
         $parts = $this->splitUrl($this->getUrl());
-        return $parts[$i - 1];
+        return isset($parts[$i - 1]) ? $parts[$i - 1] : null;
     }
     
     
@@ -611,7 +611,7 @@ class Router
         }
         
         if (ob_get_level() > 1) ob_end_clean();
-        header(self::getProtocol() . ' '. static::$httpStatusCodes[$http_code]);
+        header(self::getProtocol() . ' ' . static::$httpStatusCodes[$http_code]);
         
         if (!$this->routeTo(400, ['args'=>[$http_code, $message]])) echo $message;
         exit();
