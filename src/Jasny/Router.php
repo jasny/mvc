@@ -180,6 +180,7 @@ class Router
      */
     public static function getRequestMethod()
     {
+        if (!isset($_SERVER['REQUEST_METHOD'])) return null;
         return strtoupper(!empty($_POST['_method']) ? $_POST['_method'] : $_SERVER['REQUEST_METHOD']);
     }
     
@@ -246,7 +247,9 @@ class Router
      */
     public static function getRequestData()
     {
-        switch ($_SERVER['CONTENT_TYPE']) {
+        $contenttype = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : null;
+        
+        switch ($contenttype) {
             case 'application/x-www-form-urlencoded': return $_POST;
             case 'multipart/formdata': return $_FILES + $_POST;
             case 'application/json': return json_decode(file_get_contents('php://input'));
@@ -277,10 +280,7 @@ class Router
      */
     public function getMethod()
     {
-        if (!isset($this->method)) {
-            $this->method = strtoupper(!empty($_POST['_method']) ? $_POST['_method'] : $_SERVER['REQUEST_METHOD']);
-        }
-        
+        if (!isset($this->method)) $this->method = static::getRequestMethod();
         return $this->method;
     }
     
@@ -342,7 +342,11 @@ class Router
      */
     public function getUrl()
     {
-        if (!isset($this->url)) $this->url = urldecode(preg_replace('/\?.*$/', '', $_SERVER['REQUEST_URI']));
+        if (!isset($this->url)) {
+            if (!isset($_SERVER['REQUEST_URI'])) return null;
+            $this->url = urldecode(preg_replace('/\?.*$/', '', $_SERVER['REQUEST_URI']));
+        }
+        
         return $this->url;
     }
 
@@ -440,6 +444,13 @@ class Router
 
         $method = $this->getMethod();
         $url = $this->getUrl();
+        
+        if (!isset($url)) {
+            $this->route = false;
+            $this->httpStatus = 404;
+            
+            return $this->route;
+        }
         
         if ($this->getBase()) {
             $url = '/' . preg_replace('~^' . preg_quote(trim($this->getBase(), '/'), '~') . '~', '', ltrim($url, '/'));

@@ -125,7 +125,9 @@ class Twig extends View
         if (class_exists('Jasny\Twig\ArrayExtension')) $twig->addExtension(new \Jasny\Twig\ArrayExtension());
         
         // Set globals http://twig.sensiolabs.org/doc/advanced.html#globals
-        $twig->addGlobal('current_url', rtrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/'));
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $twig->addGlobal('current_url', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+        }
         
         self::$environment = $twig;
         return self::$environment;
