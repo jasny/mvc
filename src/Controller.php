@@ -136,7 +136,7 @@ abstract class Controller
     protected function badRequest($message, $httpCode=400)
     {
         if ($this->router) {
-            call_user_func_array([$this->router, 'forbidden'], func_get_args());
+            call_user_func_array([$this->router, 'badRequest'], func_get_args());
         } else {
             $this->request->outputError($httpCode, $message);
         }
