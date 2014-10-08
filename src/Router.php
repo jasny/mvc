@@ -545,7 +545,7 @@ class Router
         
         if (!$this->routeTo(403, ['args'=>func_get_args()])) {
             if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
-            self::outputError($httpCode, $message, $this->getOutputFormat());
+            self::outputError($httpCode, $message);
         }
     }
     
@@ -565,7 +565,7 @@ class Router
                 "Sorry, this action isn't supported" :
                 "Sorry, this page does not exist";
             
-            self::outputError($httpCode, $message, $this->getOutputFormat());
+            self::outputError($httpCode, $message);
         }
     }
 
@@ -582,7 +582,7 @@ class Router
         
         if (!$this->routeTo(500, ['args'=>func_get_args()])) {
             if (!isset($message)) $message = "Sorry, an unexpected error occured";
-            self::outputError($httpCode, $message, $this->getOutputFormat());
+            self::outputError($httpCode, $message);
         }
     }
     
@@ -737,5 +737,32 @@ class Router
     protected static function camelcase($string)
     {
         return strtr(ucwords(strtr($string, '_-', '  ')), [' ' => '']);
+    }
+
+    
+    // Proxy methods for Jasny\DB\Request. Allows overloading for customized Request class.
+    
+    /**
+     * Get the output format.
+     * Tries 'Content-Type' response header, otherwise uses 'Accept' request header.
+     * 
+     * @param string $as  'short' or 'mime'
+     * @return string
+     */
+    public static function getOutputFormat($as)
+    {
+        return Request::getOutputFormat($as);
+    }
+    
+    /**
+     * Output an HTTP error
+     * 
+     * @param int           $httpCode  HTTP status code
+     * @param string|object $message
+     * @param string        $format    The output format (auto detect by default)
+     */
+    public static function outputError($httpCode, $message, $format=null)
+    {
+        return Request::outputError($httpCode, $message, $format);
     }
 }
