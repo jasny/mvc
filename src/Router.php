@@ -88,6 +88,10 @@ class Router
     {
         if (is_object($routes)) $routes = get_object_vars($routes);
         
+        foreach ($routes as &$route) {
+            if ($route instanceof \Closure) $route = (object)['fn' => $route];
+        }
+        
         $this->routes = $routes;
         $this->route = null;
         
@@ -112,6 +116,8 @@ class Router
                 trigger_error("Route $path is already defined.", E_USER_WARNING);
                 continue;
             }
+            
+            if ($route instanceof \Closure) $route = (object)['fn' => $route];
             
             $this->routes[$path] = $route;
         }
@@ -341,28 +347,25 @@ class Router
             $route->$key = $value;
         }
         
-        // Route to file
-        if (isset($route->file)) {
-            $file = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/' . ltrim($this->rebase($route->file), '/');
-
-            if (!file_exists($file)) {
-                trigger_error("Failed to route using '{$route->route}': File '$file' doesn't exist."
-                        , E_USER_WARNING);
-                return false;
-            }
-
-            return include $file;
-        }
+        if (isset($route->controller)) return $this->routeToController($route);
+        if (isset($route->fn)) return $this->routeToCallback($route);
+        if (isset($route->file)) return $this->routeToFile($route);
         
-        // Route to controller
-        if (empty($route->controller) || empty($route->action)) {
-            trigger_error("Failed to route using '{$route->route}': "
-                    . (empty($route->controller) ? 'Controller' : 'Action') . " is not set", E_USER_WARNING);
-            return false;
-        }
+        trigger_error("Failed to route using '{$route->route}': Neither 'controller', 'fn' or 'file' is set",
+            E_USER_WARNING);
+        return false;
+    }
 
+    /**
+     * Route to controller action
+     * 
+     * @param object $route
+     * @return mixed|boolean
+     */
+    protected function routeToController($route)
+    {
         $class = $this->getControllerClass($route->controller);
-        $method = $this->getActionMethod($route->action);
+        $method = $this->getActionMethod(isset($route->action) ? $route->action : null);
         $args = isset($route->args) ? $route->args : [];
 
         if (!class_exists($class)) return false;
@@ -373,6 +376,50 @@ class Router
         $ret = call_user_func_array([$controller, $method], $args);
         return isset($ret) ? $ret : true;
     }
+    
+    /**
+     * Route to a callback function
+     * 
+     * @param object $route
+     * @return mixed|boolean
+     */
+    protected function routeToCallback($route)
+    {
+        if (!is_callable($route->fn)) {
+            trigger_error("Failed to route using '{$route->route}': Invalid callback."
+                    , E_USER_WARNING);
+            return false;
+        }
+        
+        $args = isset($route->args) ? $route->args : [];
+        
+        return call_user_func_array($route->fn, $args);
+    }
+    
+    /**
+     * Route to a file
+     * 
+     * @param object $route
+     * @return mixed|boolean
+     */
+    protected function routeToFile($route)
+    {
+        $file = ltrim($route->file, '/');
+
+        if (!file_exists($file)) {
+            trigger_error("Failed to route using '{$route->route}': File '$file' doesn't exist.", E_USER_WARNING);
+            return false;
+        }
+
+        if ($route->file[0] === '~' || strpos($route->file, '..') !== false || strpos($route->file, ':') !== false) {
+            trigger_error("Won't route using '{$route->route}': '~', '..' and ':' not allowed in filename.",
+                E_USER_WARNING);
+            return false;
+        }
+
+        return include $file;
+    }
+    
 
     /**
      * Execute the action.
@@ -423,7 +470,7 @@ class Router
         }
         
         if ($this->prevErrorHandler) {
-            //call_user_func($this->prevErrorHandler, $code, $message, $file, $line, $context);
+            call_user_func($this->prevErrorHandler, $code, $message, $file, $line, $context);
         }
         
         if ($code & (E_RECOVERABLE_ERROR | E_USER_ERROR)) {
@@ -439,14 +486,15 @@ class Router
      */
     public function onException($exception)
     {
+        $this->error(null, 500, $exception);
         if ($this->prevExceptionHandler) call_user_func($this->prevExceptionHandler, $exception);
         
-        $this->error(null, 500, $exception);
+        exit();
     }
     
 
     /**
-     * Redirect to another page and exit
+     * Redirect to another page
      * 
      * @param string $url 
      * @param int    $httpCode  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
@@ -461,11 +509,10 @@ class Router
         header("Location: $url");
         
         echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
-        exit();
     }
 
     /**
-     * Give a 400 Bad Request response and exit
+     * Give a 400 Bad Request response
      * 
      * @param string $message
      * @param int    $httpCode  Alternative HTTP status code, eg. 406 (Not Acceptable)
@@ -474,7 +521,6 @@ class Router
     public function badRequest($message, $httpCode=400)
     {
         $this->respond(400, $message, $httpCode, array_slice(func_get_args(), 2));        
-        exit();
     }
 
     /**
@@ -484,7 +530,6 @@ class Router
     public function requireLogin()
     {
         $this->routeTo(401) || $this->forbidden();
-        exit();
     }
     
     /**
@@ -502,12 +547,10 @@ class Router
             if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
             self::outputError($httpCode, $message, $this->getOutputFormat());
         }
-        
-        exit();
     }
     
     /**
-     * Give a 404 Not Found response and exit
+     * Give a 404 Not Found response
      * 
      * @param string $message
      * @param int    $httpCode  Alternative HTTP status code, eg. 410 (Gone)
@@ -524,31 +567,16 @@ class Router
             
             self::outputError($httpCode, $message, $this->getOutputFormat());
         }
-        
-        exit();
     }
 
     /**
-     * Give a 500 Internal Server Error response and exit
+     * Give a 5xx Server Error response
      * 
-     * @param string $message
-     * @param int    $httpCode  Alternative HTTP status code, eg. 503 (Service unavailable)
-     * @param mixed  $..        Additional arguments are passed to action        
+     * @param string     $message
+     * @param int|string $httpCode  HTTP status code, eg. "500 Internal Server Error" or 503
+     * @param mixed      $..        Additional arguments are passed to action        
      */
-    protected function error($message=null, $httpCode=500)
-    {
-        call_user_func_array([$this, 'displayError'], func_get_args());
-        exit();
-    }
-    
-    /**
-     * Give a 500 Internal Server Error response (but don't exit)
-     * 
-     * @param string $message
-     * @param int    $httpCode  Alternative HTTP status code, eg. 503 (Service unavailable)
-     * @param mixed  $..        Additional arguments are passed to action        
-     */
-    protected function displayError($message=null, $httpCode=500)
+    public function error($message=null, $httpCode=500)
     {
         if (ob_get_level() > 1) ob_end_clean();
         

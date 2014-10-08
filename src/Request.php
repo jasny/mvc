@@ -12,39 +12,39 @@ class Request
      * @var array
      */
     static public $httpStatusCodes = [
-        200 => '200 OK',
-        201 => '201 Created',
-        202 => '202 Accepted',
-        204 => '204 No Content',
-        205 => '205 Reset Content',
-        206 => '206 Partial Content',
-        301 => '301 Moved Permanently',
-        302 => '302 Found',
-        303 => '303 See Other',
-        304 => '304 Not Modified',
-        307 => '307 Temporary Redirect',
-        308 => '308 Permanent Redirect',
-        400 => "400 Bad Request",
-        401 => "401 Unauthorized",
-        402 => "402 Payment Required",
-        403 => "403 Forbidden",
-        404 => "404 Not Found",
-        405 => "405 Method Not Allowed",
-        406 => "406 Not Acceptable",
-        409 => "409 Conflict",
-        410 => "410 Gone",
-        415 => "415 Unsupported Media Type",
-        429 => "429 Too Many Requests",
-        500 => "500 Internal server error",
-        501 => "501 Not Implemented",
-        503 => "503 Service unavailable"
+        200 => 'OK',
+        201 => 'Created',
+        202 => 'Accepted',
+        204 => 'No Content',
+        205 => 'Reset Content',
+        206 => 'Partial Content',
+        301 => 'Moved Permanently',
+        302 => 'Found',
+        303 => 'See Other',
+        304 => 'Not Modified',
+        307 => 'Temporary Redirect',
+        308 => 'Permanent Redirect',
+        400 => 'Bad Request',
+        401 => 'Unauthorized',
+        402 => 'Payment Required',
+        403 => 'Forbidden',
+        404 => 'Not Found',
+        405 => 'Method Not Allowed',
+        406 => 'Not Acceptable',
+        409 => 'Conflict',
+        410 => 'Gone',
+        415 => 'Unsupported Media Type',
+        429 => 'Too Many Requests',
+        500 => 'Internal server error',
+        501 => 'Not Implemented',
+        503 => 'Service unavailable'
     ];
     
     /**
      * Common input and output formats with associated MIME
      * @var array
      */
-    static public $contentFormats = [
+    public static $contentFormats = [
         'text/html' => 'html',
         'application/json' => 'json',
         'application/xml' => 'xml',
@@ -64,10 +64,25 @@ class Request
      * File extensions to format mapping
      * @var array
      */
-    static public $fileExtension = [
+    public static $fileExtension = [
         'jpg' => 'jpeg',
         'txt' => 'text'
     ];
+    
+    /**
+     * Allow the use $_POST['_method'] as request method.
+     * @var boolean
+     */
+    public static $allowMethodOverride = false;
+    
+    /**
+     * Always set 'Content-Type' to 'text/plain' with a 4xx or 5xx response.
+     * This is useful when handing jQuery AJAX requests, since jQuery doesn't deserialize errors.
+     * 
+     * @var boolean
+     */
+    public static $forceTextErrors = false;
+
     
     /**
      * Get the HTTP protocol
@@ -76,21 +91,21 @@ class Request
      */
     protected static function getProtocol()
     {
-        return isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.1';
+        return isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0';
     }
     
     /**
      * Return the request method.
      * 
-     * Usually REQUEST_METHOD, but this can be overwritten by $_POST['_method'].
-     * Method is alway uppercase.
-     * 
      * @return string
      */
     public static function getMethod()
     {
-        return strtoupper(!empty($_POST['_method']) ? $_POST['_method'] : $_SERVER['REQUEST_METHOD']);
+        return static::$allowMethodOverride && !empty($_POST['_method']) ?
+            strtoupper(!empty($_POST['_method'])) :
+            strtoupper($_SERVER['REQUEST_METHOD']);
     }
+    
     
     /**
      * Get the input format.
@@ -99,17 +114,62 @@ class Request
      * @param string $as  'short' or 'mime'
      * @return string
      */
-    public static function getInputFormat($as='short')
+    public static function getInputFormat($as)
     {
-        if (empty($_SERVER['CONTENT_TYPE'])) {
-            $mime = trim(explode(';', $_SERVER['CONTENT_TYPE'])[0]);
-        }
+        if (empty($_SERVER['CONTENT_TYPE'])) return null;
+        
+        $mime = trim(explode(';', $_SERVER['CONTENT_TYPE'])[0]);
         
         return $as !== 'mime' && isset(static::$contentFormats[$mime]) ?
             static::$contentFormats[$mime] :
             $mime;
     }
     
+    /**
+     * Check `Content-Type` request header to see if input format is supported.
+     * Respond with "415 Unsupported Media Type" if the format isn't supported.
+     * 
+     * @param string|array $support  Supported formats (short or mime)
+     * @param callback     $failed   Callback when format is not supported
+     */
+    public static function supportInputFormat($support, $failed = null)
+    {
+        $mime = static::getInputFormat('mime');
+        
+        if (!isset($mime)) {
+            if (file_get_contents('php://input', false, null, -1, 1) === '') return;
+        } else {
+            if (static::matchMime($mime, $support)) return;
+        }
+        
+        // Not supported
+        $message = isset($mime) ?
+            "The request body is in an unsupported format" :
+            "The 'Content-Type' request header isn't set";
+        
+        if (isset($failed)) call_user_func($failed, $message, $support);
+        
+        static::outputError("415 Unsupported Media Type", $message);
+        exit();
+    }
+    
+    /**
+     * Check the Content-Type of the request.
+     * 
+     * @param string       $mime
+     * @param string|array $formats  Short format or MIME, may contain wildcard
+     * @return mixed
+     */
+    protected static function matchMime($mime, $formats)
+    {
+        $fnWildcardMatch = function($ret, $pattern) use ($mime) {
+            return $ret || fnmatch($pattern, $mime);
+        };
+
+        return
+            isset(static::$contentFormats[$mime]) && in_array(static::$contentFormats[$mime], $formats) ||
+            array_reduce($formats, $fnWildcardMatch, false);
+    }
     
     /**
      * Get the request input data, decoded based on Content-Type header.
@@ -118,55 +178,38 @@ class Request
      */
     public static function getInput()
     {
-        switch (static::getInputFormat()) {
-            case 'post': return $_FILES + $_POST;
-            case 'json': return json_decode(file_get_contents('php://input'));
+        switch (static::getInputFormat('short')) {
+            case 'post': $_POST + static::getPostedFiles();
+            case 'json': return json_decode(file_get_contents('php://input'), true);
             case 'xml':  return simplexml_load_string(file_get_contents('php://input'));
             default:     return file_get_contents('php://input');
         }
     }
     
     /**
-     * Get the output format.
-     * Tries 'Content-Type' response header, otherwise uses 'Accept' request header.
+     * Get $_FILES properly grouped.
      * 
-     * @param string $as  'short' or 'mime'
-     * @return string
+     * @return array
      */
-    public static function getOutputFormat($as='short')
+    protected static function getPostedFiles()
     {
-        // Explicitly set as Content-Type response header
-        foreach (headers_list() as $header) {
-            if (strpos($header, 'Content-Type:') === 0) {
-                $mime = trim(explode(';', substr($header, 13))[0]);
-                break;
+        $files = $_FILES;
+        
+        foreach ($files as &$file) {
+            if (!is_array($file['error'])) continue;
+            
+            $group = [];
+            foreach (array_keys($file['error']) as $key) {
+                foreach (array_keys($file) as $elem) {
+                    $group[$key][$elem] = $file[$elem][$key];
+                }
             }
+            $file = $group;
         }
         
-        // Accept request header
-        if (!isset($mime) && !empty($_SERVER['HTTP_ACCEPT'])) {
-            $mime = trim(explode(',', $_SERVER['HTTP_ACCEPT'])[0]);
-        }
-        
-        if (!isset($mime)) $mime = '*/*';
-        if ($mime === 'application/javascript' && !empty($_GET['callback'])) $mime = 'application/json';
-        
-        if ($mime !== '*/*') {
-            return $as === 'mime' || !isset(static::$contentFormats[$mime]) ?
-                $mime : static::$contentFormats[$mime];
-        }
-        
-        // File extension
-        $ext = pathinfo(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), PATHINFO_EXTENSION);
-        if ($ext) {
-            if (isset(static::$fileExtension[$ext])) $ext = static::$fileExtension[$ext];
-            if ($as === 'mime') return $ext;
-            return array_search($ext, static::$contentFormats) ?: $ext;
-        }
-        
-        // Don't know (default to HTML)
-        return $as === 'mime' ? '*/*' : 'html';
+        return $files;
     }
+    
     
     /**
      * Check if request is an AJAX request.
@@ -203,30 +246,180 @@ class Request
     
     
     /**
+     * Get the output format.
+     * Tries 'Content-Type' response header, otherwise uses 'Accept' request header.
+     * 
+     * @param string $as  'short' or 'mime'
+     * @return string
+     */
+    public static function getOutputFormat($as)
+    {
+        // Explicitly set as Content-Type response header
+        foreach (headers_list() as $header) {
+            if (strpos($header, 'Content-Type:') === 0) {
+                $mime = trim(explode(';', substr($header, 13))[0]);
+                break;
+            }
+        }
+        
+        // Accept request header
+        if (!isset($mime) && !empty($_SERVER['HTTP_ACCEPT'])) {
+            $mime = trim(explode(',', $_SERVER['HTTP_ACCEPT'])[0]);
+        }
+        
+        if (!isset($mime)) $mime = '*/*';
+        if ($mime === 'application/javascript' && !empty($_GET['callback'])) $mime = 'application/json';
+        
+        if ($mime !== '*/*') {
+            return $as === 'mime' || !isset(static::$contentFormats[$mime]) ?
+                $mime : static::$contentFormats[$mime];
+        }
+        
+        // File extension
+        $ext = pathinfo(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), PATHINFO_EXTENSION);
+        if ($ext) {
+            if (isset(static::$fileExtension[$ext])) $ext = static::$fileExtension[$ext];
+            return ($as === 'mime') ? (array_search($ext, static::$contentFormats) ?: $ext) : $ext;
+        }
+        
+        // Don't know (default to HTML)
+        return $as === 'mime' ? '*/*' : 'html';
+    }
+
+    /**
+     * Accept requests from a specific origin.
+     * 
+     * Sets HTTP Access-Control headers (CORS).
+     * @link http://www.w3.org/TR/cors/
+     * 
+     * The following settings are available:
+     *  - expose-headers
+     *  - max-age
+     *  - allow-credentials
+     *  - allow-methods (default '*')
+     *  - allow-headers (default '*')
+     * 
+     * <code>
+     *   Request::allowOrigin('same');
+     *   Request::allowOrigin('www.example.com');
+     *   Request::allowOrigin('*.example.com');
+     *   Request::allowOrigin(['*.example.com', 'www.example.net']);
+     *   Request::allowOrigin('*');
+     * 
+     *   Request::allowOrigin('same', [], function() {
+     *     static::respondWith("403 forbidden", 'html');
+     *     echo "<h1>Forbidden</h1><p>Sorry, we have a strict same-origin policy.</p>";
+     *     exit();
+     *   });
+     * </code>
+     * 
+     * @param string|array $urls      Allowed URL/URLs, may use wildcards or "same"
+     * @param array        $settings
+     * @param callback     $failed    Called when origin is not allowed
+     */
+    public static function allowOrigin($urls, array $settings = [], $failed = null)
+    {
+        $origin = static::matchOrigin($urls);
+        
+        static::setAllowOriginHeaders($origin ?: $urls, $settings);
+        
+        if (!isset($origin)) {
+            $message = "Origin not allowed";
+            if (isset($failed)) call_user_func($failed, $message, $urls);
+            static::outputError("403 forbidden", $message);
+            exit();
+        }
+    }
+
+    /**
+     * Match `Origin` header to supplied urls.
+     * 
+     * @param string|array $urls
+     * @return string
+     */
+    protected function matchOrigin($urls)
+    {
+        if ($urls === '*') return '*';
+        
+        if (!is_array($urls)) $urls = (array)$urls;
+        
+        $origin = parse_url($_SERVER['origin']) + ['port' => 80];
+        
+        foreach ($urls as &$url) {
+            if ($url === 'same') $url = '//' . $_SERVER['HTTP_HOST'];
+            if (strpos($url, ':') && substr($url, 0, 2) !== '//') $url = '//' . $url;
+            
+            $match = parse_url($url);
+            $found =
+                (!isset($match['scheme']) || $match['scheme'] === $origin['schema']) &&
+                (!isset($match['port']) || $match['port'] === $origin['port']) &&
+                fnmatch($match['domain'], $origin['port']);
+            
+            if ($found) return $_SERVER['origin'];
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Sets HTTP Access-Control headers (CORS).
+     * 
+     * @param string|array $origin
+     * @param array        $settings
+     */
+    protected function setAllowOriginHeaders($origin, array $settings = [])
+    {
+        foreach ((array)$origin as $url) {
+            header("Access-Control-Allow-Origin: $url");
+        }
+        
+        if (isset($settings['expose-headers'])) {
+            header("Access-Control-Allow-Credentials: " . join(', ', (array)$settings['expose-headers']));
+        }
+        
+        if (isset($settings['max-age'])) {
+            header("Access-Control-Max-Age: " . join(', ', (array)$settings['max-age']));
+        }
+        
+        if (isset($settings['allow-credentials'])) {
+            $set = $settings['allow-credentials'];
+            header("Access-Control-Allow-Credentials: " . (is_string($set) ? $set : ($set ? 'true' : 'false')));
+        }
+        
+        $methods = isset($settings['allow-methods']) ? $settings['allow-methods'] : '*';
+        header("Access-Control-Allow-Methods: " . join(', ', (array)$methods));
+
+        $headers = isset($settings['allow-headers']) ? $settings['allow-headers'] : '*';
+        header("Access-Control-Allow-Headers: " . join(', ', (array)$headers));
+    }
+
+    
+    /**
      * Set the headers with HTTP status code and content type.
      * @link http://en.wikipedia.org/wiki/List_of_HTTP_status_codes
      * 
      * Examples:
      * <code>
-     *   static::respondWith(200, 'json');
-     *   static::respondWith(200, 'application/json');
-     *   static::respondWith(204);
-     *   static::respondWith('json');
+     *   Request::respondWith(200, 'json');
+     *   Request::respondWith(200, 'application/json');
+     *   Request::respondWith(204);
+     *   Request::respondWith("204 Created");
+     *   Request::respondWith('json');
+     *   Request::respondWith(['json', 'xml']);
      * </code>
      * 
-     * @param int    $httpCode  HTTP status code (may be omitted)
-     * @param string $format    Mime or content format
+     * @param int          $httpCode  HTTP status code (may be omitted)
+     * @param string|array $format    Mime or content format
+     * @param callback     $failed    Called if format isn't accepted
      */
-    public static function respondWith($httpCode, $format=null)
+    public static function respondWith($httpCode, $format = null)
     {
-        if (!isset($format) && !is_int($httpCode) && !ctype_digit($httpCode)) {
-            $format = $httpCode;
-            $httpCode = null;
+        // Shift arguments if $httpCode is omitted
+        if (!is_int($httpCode) && !preg_match('/^\d{3}\b/', $httpCode)) {
+            list($httpCode, $format) = array_merge([null], func_get_args());
         }
 
-        if (isset($httpCode)) {
-            header(static::getProtocol() . ' ' . static::$httpStatusCodes[$httpCode]);
-        }
+        if (isset($httpCode)) http_response_code((int)$httpCode);
         
         if (isset($format)) {
             $contentType = array_search($format, static::$contentFormats) ?: $format;
@@ -237,11 +430,12 @@ class Request
     /**
      * Output result as json, xml or image.
      * 
-     * @param mixed $data
+     * @param mixed  $data
+     * @param string $format    Mime or content format
      */
-    public function output($data)
+    public function output($data, $format = null)
     {
-        $format = static::getOutputFormat();
+        if (!isset($format)) $format = static::getOutputFormat();
         
         switch ($format) {
             case 'json': static::outputJSON($data); break;
@@ -256,8 +450,7 @@ class Request
         
             default:
                 $type = (is_object($data) ? get_class($data) . ' ' : '') . gettype($data);
-                $a = in_array($type[0], explode('', 'aeiouAEIOU')) ? 'an' : 'a';
-                trigger_error("Don't know how to convert $a $type to $format", E_USER_ERROR);
+                trigger_error("Don't know how to convert a $type to $format", E_USER_ERROR);
         }
     }
         
@@ -270,8 +463,7 @@ class Request
     {
         if (!$result instanceof \DOMNode && !$result instanceof \SimpleXMLElement) {
             $type = (is_object($result) ? get_class($result) . ' ' : '') . gettype($result);
-            $a = in_array($type[0], explode('', 'aeiouAEIOU')) ? 'an' : 'a';
-            throw new \Exception("Was expecting a DOMNode or SimpleXMLElement object, got $a $type");
+            throw new \Exception("Was expecting a DOMNode or SimpleXMLElement object, got a $type");
         }
         
         static::respondWith('xml');
@@ -287,7 +479,7 @@ class Request
      */
     protected function outputJSON($result)
     {
-        if ($this->request->isJsonp()) {
+        if (static::isJsonp()) {
             static::respondWith(200, 'js');
             echo $_GET['callback'] . '(' . json_encode($result) . ')';
             return;
@@ -307,8 +499,7 @@ class Request
     {
         if (!is_resource($image)) {
             $type = (is_object($image) ? get_class($image) . ' ' : '') . gettype($image);
-            $a = in_array($type[0], explode('', 'aeiouAEIOU')) ? 'an' : 'a';
-            throw new \Exception("Was expecting a GD resource, got $a $type");
+            throw new \Exception("Was expecting a GD resource, got a $type");
         }
         
         static::respondWith("image/$format");
@@ -316,7 +507,7 @@ class Request
         $out = 'image' . $format;
         $out($image);
     }
-    
+
 
     /**
      * Output an HTTP error
@@ -358,7 +549,7 @@ class Request
      */
     protected static function outputErrorJson($httpCode, $error)
     {
-        $result = ['_error' => $error, '_httpCode' => $httpCode];
+        $result = ['error' => $error, 'httpCode' => $httpCode];
         
         static::respondWith($httpCode, 'json');
         static::output($result);

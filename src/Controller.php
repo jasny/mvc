@@ -32,6 +32,8 @@ abstract class Controller
     public function __construct($router=null)
     {
         $this->router = $router;
+        
+        // Static classes are instantiated to make it easier to use custom versions
         $this->request = new Request();
         $this->flash = new Flash();
     }
@@ -46,6 +48,51 @@ abstract class Controller
         return $this->request->getLocalReferer();
     }
     
+    
+    /**
+     * Get the request input data, decoded based on Content-Type header.
+     * 
+     * @param string|array $supportedFormats  Supported input formats (mime or short format)
+     * @return mixed
+     */
+    protected function getInput($supportedFormats = null)
+    {
+        if (isset($supportedFormats)) {
+            $failed = $this->router ? function($message) {
+                $this->router->badRequest($message, 415);
+            } : null;
+            
+            $this->request->supportInputFormat($supportedFormats, $failed);
+        }
+        
+        return $this->request->getInput();
+    }
+    
+    
+    /**
+     * Set the headers with HTTP status code and content type.
+     * 
+     * @param int    $httpCode  HTTP status code (may be omitted)
+     * @param string $format    Mime or simple format
+     * @return $this
+     */
+    protected function respondWith($httpCode, $format=null)
+    {
+        $this->request->respondWith($httpCode, $format);
+        return $this;
+    }
+    
+    /**
+     * Output data
+     * 
+     * @param array  $data
+     * @param string $format    Mime or content format
+     * @return $this
+     */
+    protected function output($data, $format = null)
+    {
+        $this->request->output($data, $format);
+    }
     
     /**
      * Show a view.
@@ -65,42 +112,44 @@ abstract class Controller
     
     
     /**
-     * Get the request input data, decoded based on Content-Type header.
+     * Respond with 200 Ok.
+     * This is the default state, so you usually don't have to set it explicitly.
      * 
-     * @return mixed
+     * @return $this;
      */
-    protected function getInput()
+    protected function ok()
     {
-        return $this->request->getInput();
+        $this->request->respondWith(200);
     }
     
     /**
-     * Set the headers with HTTP status code and content type.
+     * Respond with 201 Created
      * 
-     * @param int    $httpCode  HTTP status code (may be omitted)
-     * @param string $format    Mime or simple format
-     * @return Controller $this
+     * @param string $location  Location of the created resource
+     * @return $this;
      */
-    protected function respondWith($httpCode, $format=null)
+    protected function created($location = null)
     {
-        $this->request->respondWith($httpCode, $format);
-        return $this;
+        $this->request->respondWith(201);
+        if (isset($location)) header("Location: $location");
     }
     
     /**
-     * Output data
+     * Respond with 204 No Content
      * 
-     * @param array $data
+     * @return $this;
      */
-    protected function output($data)
+    protected function noContent()
     {
-        $this->request->output($data);
+        $this->request->respondWith(204);
     }
     
     
     /**
      * Redirect to previous page.
      * Must be on this website, otherwise redirect to home.
+     * 
+     * @return $this;
      */
     protected function back()
     {
@@ -122,8 +171,6 @@ abstract class Controller
             header("Location: $url");
             echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
         }
-        
-        exit();
     }
     
     
@@ -140,8 +187,6 @@ abstract class Controller
         } else {
             $this->request->outputError($httpCode, $message);
         }
-        
-        exit();
     }
 
     /**
@@ -169,8 +214,6 @@ abstract class Controller
             if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
             $this->request->outputError($httpCode, $message);
         }
-        
-        exit();
     }
 
     /**
@@ -187,8 +230,6 @@ abstract class Controller
             if (!isset($message)) $message = "Sorry, this page does not exist";
             $this->request->outputError($httpCode, $message);
         }
-
-        exit();
     }
     
     /**
@@ -205,7 +246,50 @@ abstract class Controller
         } else {
             $this->request->outputError($httpCode, $message);
         }
-        
-        exit();
+    }
+    
+    
+    /**
+     * Check if response is 2xx succesful
+     * 
+     * @return boolean
+     */
+    protected function isSuccessful()
+    {
+        $code = http_response_code();
+        return $code >= 200 && $code < 300;
+    }
+    
+    /**
+     * Check if response is a 3xx redirect
+     * 
+     * @return boolean
+     */
+    protected function isRedirection()
+    {
+        $code = http_response_code();
+        return $code >= 300 && $code < 400;
+    }
+    
+    /**
+     * Check if response is a 4xx client error
+     * 
+     * @return boolean
+     */
+    protected function isClientError()
+    {
+        $code = http_response_code();
+        return $code >= 400 && $code < 500;
+    }
+    
+    /**
+     * Check if response is a 5xx redirect
+     * 
+     * @return boolean
+     */
+    protected function isServerError()
+    {
+        $code = http_response_code();
+        return $code >= 500;
     }
 }
