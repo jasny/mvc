@@ -749,7 +749,7 @@ class Router
      * @param string $as  'short' or 'mime'
      * @return string
      */
-    public static function getOutputFormat($as)
+    protected static function getOutputFormat($as)
     {
         return Request::getOutputFormat($as);
     }
@@ -761,7 +761,7 @@ class Router
      * @param string|object $message
      * @param string        $format    The output format (auto detect by default)
      */
-    public static function outputError($httpCode, $message, $format=null)
+    protected static function outputError($httpCode, $message, $format=null)
     {
         return Request::outputError($httpCode, $message, $format);
     }
