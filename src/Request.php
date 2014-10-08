@@ -431,11 +431,15 @@ class Request
      * Output result as json, xml or image.
      * 
      * @param mixed  $data
-     * @param string $format    Mime or content format
+     * @param string $format  Mime or content format
      */
     public function output($data, $format = null)
     {
-        if (!isset($format)) $format = static::getOutputFormat();
+        if (!isset($format)) {
+            $format = static::getOutputFormat('short');
+        } else {
+            $format = isset(static::$contentFormats[$format]) ? static::$contentFormats[$format] : $format;
+        }
         
         switch ($format) {
             case 'json': static::outputJSON($data); break;
@@ -520,7 +524,11 @@ class Request
     {
         if (ob_get_level() > 1) ob_end_clean();
 
-        if (!isset($format)) $format = static::getOutputFormat();
+        if (!isset($format)) {
+            $format = static::getOutputFormat('short');
+        } else {
+            $format = isset(static::$contentFormats[$format]) ? static::$contentFormats[$format] : $format;
+        }
         
         switch ($format) {
             case 'json':
@@ -535,10 +543,16 @@ class Request
             case 'gif':
             case 'jpeg':
                 return static::outputErrorImage($httpCode, $message, $format);
+
+            case 'html':
+                static::respondWith($httpCode, 'html');
+                return static::outputErrorHTML($message);
+                
+            case 'text':
+            default:
+                static::respondWith($httpCode, 'text');
+                return static::outputErrorText($message);
         }
-        
-        static::respondWith($httpCode, 'text');
-        echo is_array($message) ? $message : json_encode($message, JSON_PRETTY_PRINT);
     }
     
     /**
@@ -583,7 +597,7 @@ class Request
      * @param string        $format  'jpeg', 'png' or 'gif'
      * @param string|object $error
      */
-    protected static function outputErrorImage($format, $error=null)
+    protected static function outputErrorImage($httpCode, $format, $error=null)
     {
         $image = imagecreate(100, 100);
         $black = imagecolorallocate($image, 0, 0, 0);
@@ -601,7 +615,69 @@ class Request
             }
         }
         
-        static::respondWith($format);
+        static::respondWith($httpCode, $format);
         static::output($image);
+    }
+    
+    /**
+     * Output an error as HTML
+     * 
+     * @param string|object $error
+     */
+    protected static function outputErrorHTML($error)
+    {
+        if (is_resource($error)) {
+            echo "Unexpected error";
+            trigger_error("An error occured, but the message is a " . get_resource_type($error) . " resource",
+                E_USER_WARNING);
+            return;
+        }
+        
+        if (is_scalar($error) || (is_object($error) && method_exists($error, '__toString'))) {
+            echo $error;
+            return;
+        }
+
+        if (is_int(key($error))) {
+            echo "<ul>";
+            foreach ($error as $key => $value) {
+                echo "<li>", static::outputErrorHTML($value), "</li>";
+            }
+            echo "</ul>";
+        } else {
+            echo "<dl>";
+            foreach ($error as $key => $value) {
+                echo "<dt>", $key, "</dt><dd>", static::outputErrorHTML($value), "</dd>";
+            }
+            echo "</dl>";
+        }
+    }
+    
+    /**
+     * Output an error as text
+     * 
+     * @param string|object $error
+     * @param int           $indent
+     */
+    protected static function outputErrorText($error, $indent = 0)
+    {
+        if (is_resource($error)) {
+            echo "Unexpected error";
+            trigger_error("An error occured, but the message is a " . get_resource_type($error) . " resource",
+                E_USER_WARNING);
+            return;
+        }
+        
+        if (is_scalar($error) || (is_object($error) && method_exists($error, '__toString'))) {
+            echo $error;
+            return;
+        }
+        
+        if ($indent > 0) echo "\n";
+        
+        foreach ($error as $key => $value) {
+            echo str_repeat(" ", $indent), is_int($key) ? '- ' : $key . ': ',
+                static::outputErrorText($value, $indent + 2), "\n";
+        }
     }
 }
