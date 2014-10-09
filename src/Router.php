@@ -256,12 +256,12 @@ class Router
      * 
      * @param string $method
      * @param string $url
-     * @return string|int   < 0 means no route found
+     * @return string
      */
     protected function findRoute($method, $url)
     {
         $this->getRoutes(); // Make sure the routes are initialised
-        $ret = -404;
+        $ret = null;
         
         if ($url !== '/') $url = rtrim($url, '/');
         if (substr($url, 0, 2) == '/:') $url = substr($url, 2);
@@ -279,7 +279,6 @@ class Router
             if ($path !== '/') $path = rtrim($path, '/');
             if ($this->fnmatch($path, $url)) {
                 if ((empty($inc) || in_array($method, $inc)) && !in_array($method, $excl)) return $route;
-                $ret = -405;
             }
         }
 
@@ -304,12 +303,12 @@ class Router
 
         $match = $this->findRoute($method, $url);
 
-        if (!is_int($match) || $match >= 0) {
+        if ($match) {
             $this->route = $this->bind($this->routes[$match], $this->splitUrl($url));
             $this->route->route = $match;
         } else {
             $this->route = false;
-            $this->httpStatus = -1 * $match;
+            $this->httpStatus = 404;
         }
 
         return $this->route;
@@ -371,8 +370,13 @@ class Router
         if (!class_exists($class)) return false;
 
         $controller = new $class($this);
-        if (!is_callable([$controller, $method])) return false;
-
+        
+        if (!class_exists($controller)) return false;
+        if (!is_callable([$controller, $method])) {
+            $this->httpStatus = 405;
+            return false;
+        }
+        
         $ret = call_user_func_array([$controller, $method], $args);
         return isset($ret) ? $ret : true;
     }

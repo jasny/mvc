@@ -35,7 +35,21 @@ abstract class Controller
         
         // Static classes are instantiated to make it easier to use custom versions
         $this->request = new Request();
-        $this->flash = new Flash();
+    }
+    
+    /**
+     * Set the flash message and/or return the flash object.
+     * 
+     * @param mixed $type     flash type, eg. 'error', 'notice' or 'success'
+     * @param mixed $message  flash message
+     * @return Flash
+     */
+    protected function flash($type = null, $message = null)
+    {
+        if (!isset($this->flash)) $this->flash = new Flash();
+        
+        if (isset($type) && isset($message)) $this->flash->set($type, $message);
+        return $this->flash;
     }
     
     /**
@@ -246,6 +260,47 @@ abstract class Controller
         } else {
             $this->request->outputError($httpCode, $message);
         }
+    }
+    
+    
+    /**
+     * Check if request has POST method
+     * 
+     * @return boolean
+     */
+    protected function isGetRequest()
+    {
+        return $this->request->getMethod() === 'GET';
+    }
+    
+    /**
+     * Check if request has POST method
+     * 
+     * @return boolean
+     */
+    protected function isPostRequest()
+    {
+        return $this->request->getMethod() === 'POST';
+    }
+    
+    /**
+     * Check if request has POST method
+     * 
+     * @return boolean
+     */
+    protected function isPutRequest()
+    {
+        return $this->request->getMethod() === 'PUT';
+    }
+    
+    /**
+     * Check if request has POST method
+     * 
+     * @return boolean
+     */
+    protected function isDeleteRequest()
+    {
+        return $this->request->getMethod() === 'DELETE';
     }
     
     

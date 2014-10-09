@@ -21,10 +21,5 @@
         "psr-4": {
             "Jasny\\MVC\\": "src/"
         }
-    },
-    "extra": {
-        "branch-alias": {
-            "dev-v2-wip": "2.0.x-dev"
-        }
     }
 }

@@ -295,7 +295,7 @@ class Request
      * The following settings are available:
      *  - expose-headers
      *  - max-age
-     *  - allow-credentials
+     *  - allow-credentials (default true)
      *  - allow-methods (default '*')
      *  - allow-headers (default '*')
      * 
@@ -319,8 +319,10 @@ class Request
      */
     public static function allowOrigin($urls, array $settings = [], $failed = null)
     {
-        $origin = static::matchOrigin($urls);
+        if (!isset($_SERVER['HTTP_ORIGIN'])) return;
         
+        $origin = static::matchOrigin($urls);
+       
         static::setAllowOriginHeaders($origin ?: $urls, $settings);
         
         if (!isset($origin)) {
@@ -343,19 +345,19 @@ class Request
         
         if (!is_array($urls)) $urls = (array)$urls;
         
-        $origin = parse_url($_SERVER['origin']) + ['port' => 80];
+        $origin = parse_url($_SERVER['HTTP_ORIGIN']) + ['port' => 80];
         
         foreach ($urls as &$url) {
             if ($url === 'same') $url = '//' . $_SERVER['HTTP_HOST'];
-            if (strpos($url, ':') && substr($url, 0, 2) !== '//') $url = '//' . $url;
+            if (strpos($url, ':') === false && substr($url, 0, 2) !== '//') $url = '//' . $url;
             
             $match = parse_url($url);
             $found =
-                (!isset($match['scheme']) || $match['scheme'] === $origin['schema']) &&
+                (!isset($match['scheme']) || $match['scheme'] === $origin['scheme']) &&
                 (!isset($match['port']) || $match['port'] === $origin['port']) &&
-                fnmatch($match['domain'], $origin['port']);
+                fnmatch($match['host'], $origin['host']);
             
-            if ($found) return $_SERVER['origin'];
+            if ($found) return $_SERVER['HTTP_ORIGIN'];
         }
         
         return null;
@@ -381,10 +383,8 @@ class Request
             header("Access-Control-Max-Age: " . join(', ', (array)$settings['max-age']));
         }
         
-        if (isset($settings['allow-credentials'])) {
-            $set = $settings['allow-credentials'];
-            header("Access-Control-Allow-Credentials: " . (is_string($set) ? $set : ($set ? 'true' : 'false')));
-        }
+        $cre = isset($settings['allow-credentials']) ? $settings['allow-credentials'] : true;
+        header("Access-Control-Allow-Credentials: " . (is_string($cre) ? $cre : ($cre ? 'true' : 'false')));
         
         $methods = isset($settings['allow-methods']) ? $settings['allow-methods'] : '*';
         header("Access-Control-Allow-Methods: " . join(', ', (array)$methods));
@@ -563,7 +563,8 @@ class Request
      */
     protected static function outputErrorJson($httpCode, $error)
     {
-        $result = ['error' => $error, 'httpCode' => $httpCode];
+        $result = ['error' => $error];
+        if (static::isJsonp()) $result['httpCode'] = $httpCode;
         
         static::respondWith($httpCode, 'json');
         static::output($result);
