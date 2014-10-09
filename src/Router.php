@@ -47,12 +47,6 @@ class Router
      * @var object 
      */
     protected $route;
-
-    /**
-     * The HTTP status to use by not found
-     * @var int
-     */
-    protected $httpStatus;
     
     
     /**
@@ -308,7 +302,6 @@ class Router
             $this->route->route = $match;
         } else {
             $this->route = false;
-            $this->httpStatus = 404;
         }
 
         return $this->route;
@@ -370,11 +363,7 @@ class Router
         if (!class_exists($class)) return false;
 
         $controller = new $class($this);
-        
-        if (!is_callable([$controller, $method])) {
-            $this->httpStatus = 405;
-            return false;
-        }
+        if (!is_callable([$controller, $method])) return false;
         
         $ret = call_user_func_array([$controller, $method], $args);
         return isset($ret) ? $ret : true;
@@ -427,6 +416,8 @@ class Router
     /**
      * Execute the action.
      * 
+     * @todo Check if route would be available for other HTTP methods to respond with a 405
+     * 
      * @return mixed  Whatever the controller returns
      */
     public function execute()
@@ -434,7 +425,9 @@ class Router
         $route = $this->getRoute();
         if ($route) $ret = $this->routeTo($route);
         
-        if (!isset($ret) || $ret === false) return $this->notFound(null, $this->httpStatus ?: 404);
+        $httpCode = 404; // or 405?
+        
+        if (!isset($ret) || $ret === false) return $this->notFound(null, $httpCode);
         return $ret;
     }
 
