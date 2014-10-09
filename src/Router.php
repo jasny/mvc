@@ -694,6 +694,8 @@ class Router
             // Single part
             if (!ctype_digit(substr($option, 1))) return [$option];
             
+            $i = (int)substr($option, 1);
+            
             $part = array_slice($parts, $i-1, 1);
             if (!empty($part)) return $part;
         }
