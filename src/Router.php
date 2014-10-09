@@ -371,7 +371,6 @@ class Router
 
         $controller = new $class($this);
         
-        if (!class_exists($controller)) return false;
         if (!is_callable([$controller, $method])) {
             $this->httpStatus = 405;
             return false;
