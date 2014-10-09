@@ -680,10 +680,12 @@ class Router
                 continue;
             }
             
-            $i = (int)substr($option, 1);
-            
             // Multiple parts
             if (substr($option, -3) === '...') {
+                if (!ctype_digit(substr($option, 1, -3))) return [$option];
+                
+                $i = (int)substr($option, 1, -3);
+                
                 if ($type === 'assoc') {
                     trigger_error("Binding multiple parts using '$option'"
                         . " is only allowed in numeric arrays", E_USER_WARNING);
@@ -694,6 +696,8 @@ class Router
             }
             
             // Single part
+            if (!ctype_digit(substr($option, 1))) return [$option];
+            
             $part = array_slice($parts, $i-1, 1);
             if (!empty($part)) return $part;
         }
