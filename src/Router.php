@@ -22,7 +22,7 @@ class Router
      * Specific routes
      * @var array 
      */
-    protected $routes;
+    protected $routes = [];
 
     /**
      * Method for route
@@ -126,10 +126,6 @@ class Router
      */
     public function getRoutes()
     {
-        if (!isset($this->routes)) $this->setRoutes([
-            '/**' => (object)['controller' => '$1|default', 'action' => '$2|index', 'args' => ['$3+']]
-        ]);
-        
         return $this->routes;
     }
 
