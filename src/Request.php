@@ -563,10 +563,10 @@ class Request
      */
     protected static function outputErrorJson($httpCode, $error)
     {
-        $result = ['error' => $error];
+        $result = is_scalar($error) ? compact('error') : $error;
         if (static::isJsonp()) $result['httpCode'] = $httpCode;
         
-        static::respondWith($httpCode, 'json');
+        static::respondWith($httpCode, static::isJsonp() ? 'js' : 'json');
         static::output($result);
     }
     
