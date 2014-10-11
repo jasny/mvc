@@ -393,6 +393,24 @@ class Request
         header("Access-Control-Allow-Headers: " . join(', ', (array)$headers));
     }
 
+    /**
+     * Set HTTP caching policy.
+     * @link http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html
+     * @link https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching#defining-optimal-cache-control-policy
+     * 
+     * <code>
+     *   Request::setCachingPolicy('no-store');
+     *   Request::setCachingPolicy(['no-cache', 'private', 'max-age' => '10 days']);
+     * </code>
+     * 
+     * @param string|array $control
+     * @param string       $etag
+     */
+    public function setCachingPolicy($control, $etag = null)
+    {
+        trigger_error("Not implemented yet", E_USER_WARNING);
+    }
+    
     
     /**
      * Set the headers with HTTP status code and content type.
