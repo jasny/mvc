@@ -497,9 +497,10 @@ class Router
         
         if ($url[0] === '/' && substr($url, 0, 2) !== '//') $url = $this->rebase($url);
         
-        Request::respondWith($httpCode, 'html');
+        http_response_code((int)$httpCode);
         header("Location: $url");
         
+        header('Content-Type: text/html');
         echo 'You are being redirected to <a href="' . $url . '">' . $url . '</a>';
     }
 
@@ -512,7 +513,9 @@ class Router
      */
     public function badRequest($message, $httpCode=400)
     {
-        $this->respond(400, $message, $httpCode, array_slice(func_get_args(), 2));        
+        if (!$this->routeTo(400, ['args'=>func_get_args()])) {
+            self::outputError($httpCode, $message);
+        }
     }
 
     /**
