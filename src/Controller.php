@@ -179,7 +179,7 @@ abstract class Controller
      * @param string $url 
      * @param int    $httpCode  301 (Moved Permanently), 303 (See Other) or 307 (Temporary Redirect)
      */
-    protected function redirect($url, $httpCode=303)
+    protected function redirect($url, $httpCode = 303)
     {
         if ($this->router) {
             $this->router->redirect($url, $httpCode);
@@ -197,7 +197,7 @@ abstract class Controller
      * @param string $message
      * @param int    $httpCode  HTTP status code
      */
-    protected function badRequest($message, $httpCode=400)
+    protected function badRequest($message, $httpCode = 400)
     {
         if ($this->router) {
             call_user_func_array([$this->router, 'badRequest'], func_get_args());
@@ -223,7 +223,7 @@ abstract class Controller
      * @param string $message
      * @param int    $httpCode  HTTP status code
      */
-    protected function forbidden($message=null, $httpCode=403)
+    protected function forbidden($message=null, $httpCode = 403)
     {
         if ($this->router) {
             call_user_func_array([$this->router, 'forbidden'], func_get_args());
@@ -239,12 +239,42 @@ abstract class Controller
      * @param string $message
      * @param int    $httpCode  HTTP status code
      */
-    protected function notFound($message=null, $httpCode=404)
+    protected function notFound($message=null, $httpCode = 404)
     {
         if ($this->router) {
             call_user_func_array([$this->router, 'notFound'], func_get_args());
         } else {
             if (!isset($message)) $message = "Sorry, this page does not exist";
+            $this->request->outputError($httpCode, $message);
+        }
+    }
+    
+    /**
+     * Give a 409 Conflict response
+     * 
+     * @param string $message
+     * @param int    $httpCode  HTTP status code
+     */
+    protected function conflict($message, $httpCode = 409)
+    {
+        if ($this->router) {
+            call_user_func_array([$this->router, 'badRequest'], func_get_args());
+        } else {
+            $this->request->outputError($httpCode, $message);
+        }
+    }
+    
+    /**
+     * Give a 429 Too Many Requests response when the rate limit is exceded.
+     * 
+     * @param type $message
+     * @param type $httpCode
+     */
+    protected function tooManyRequests($message, $httpCode = 429)
+    {
+        if ($this->router) {
+            call_user_func_array([$this->router, 'badRequest'], func_get_args());
+        } else {
             $this->request->outputError($httpCode, $message);
         }
     }
@@ -256,7 +286,7 @@ abstract class Controller
      * @param int    $httpCode  HTTP status code
      * @return boolean
      */
-    public function error($message, $httpCode=500)
+    public function error($message, $httpCode = 500)
     {
         if ($this->router) {
             call_user_func_array([$this->router, 'error'], func_get_args());
