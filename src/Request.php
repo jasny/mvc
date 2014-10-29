@@ -116,9 +116,15 @@ class Request
      */
     public static function getInputFormat($as)
     {
-        if (empty($_SERVER['CONTENT_TYPE'])) return null;
+        if (!empty($_SERVER['CONTENT_TYPE'])) {
+            $contentType = $_SERVER['CONTENT_TYPE'];
+        } elseif (!empty($_SERVER['HTTP_CONTENT_TYPE'])) {
+            $contentType = $_SERVER['HTTP_CONTENT_TYPE'];
+        } else {
+            return null;
+        }
         
-        $mime = trim(explode(';', $_SERVER['CONTENT_TYPE'])[0]);
+        $mime = trim(explode(';', $contentType)[0]);
         
         return $as !== 'mime' && isset(static::$contentFormats[$mime]) ?
             static::$contentFormats[$mime] :

@@ -72,9 +72,12 @@ abstract class Controller
     protected function getInput($supportedFormats = null)
     {
         if (isset($supportedFormats)) {
-            $failed = $this->router ? function($message) {
+            $failed = null;
+            
+            if ($this->router) $failed = function($message) {
                 $this->router->badRequest($message, 415);
-            } : null;
+                exit();
+            };
             
             $this->request->supportInputFormat($supportedFormats, $failed);
         }
