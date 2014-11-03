@@ -200,7 +200,7 @@ abstract class Controller
     protected function badRequest($message, $httpCode = 400)
     {
         if ($this->router) {
-            call_user_func_array([$this->router, 'badRequest'], func_get_args());
+            call_user_func_array([$this->router, 'badRequest'], func_get_args() + [1 => $httpCode]);
         } else {
             $this->request->outputError($httpCode, $message);
         }
@@ -226,7 +226,7 @@ abstract class Controller
     protected function forbidden($message=null, $httpCode = 403)
     {
         if ($this->router) {
-            call_user_func_array([$this->router, 'forbidden'], func_get_args());
+            call_user_func_array([$this->router, 'forbidden'], func_get_args() + [1 => $httpCode]);
         } else {
             if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
             $this->request->outputError($httpCode, $message);
@@ -242,7 +242,7 @@ abstract class Controller
     protected function notFound($message=null, $httpCode = 404)
     {
         if ($this->router) {
-            call_user_func_array([$this->router, 'notFound'], func_get_args());
+            call_user_func_array([$this->router, 'notFound'], func_get_args() + [1 => $httpCode]);
         } else {
             if (!isset($message)) $message = "Sorry, this page does not exist";
             $this->request->outputError($httpCode, $message);
@@ -258,7 +258,7 @@ abstract class Controller
     protected function conflict($message, $httpCode = 409)
     {
         if ($this->router) {
-            call_user_func_array([$this->router, 'badRequest'], func_get_args());
+            call_user_func_array([$this->router, 'badRequest'], func_get_args() + [1 => $httpCode]);
         } else {
             $this->request->outputError($httpCode, $message);
         }
@@ -273,7 +273,7 @@ abstract class Controller
     protected function tooManyRequests($message, $httpCode = 429)
     {
         if ($this->router) {
-            call_user_func_array([$this->router, 'badRequest'], func_get_args());
+            call_user_func_array([$this->router, 'badRequest'], func_get_args() + [1 => $httpCode]);
         } else {
             $this->request->outputError($httpCode, $message);
         }
@@ -289,7 +289,7 @@ abstract class Controller
     public function error($message, $httpCode = 500)
     {
         if ($this->router) {
-            call_user_func_array([$this->router, 'error'], func_get_args());
+            call_user_func_array([$this->router, 'error'], func_get_args() + [1 => $httpCode]);
         } else {
             $this->request->outputError($httpCode, $message);
         }
