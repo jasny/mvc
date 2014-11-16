@@ -176,7 +176,7 @@ abstract class Controller
     {
         if ($this->router) return $this->router->badRequest($message, $http_code);
         
-        Router::outputHttpError($http_code, $message);
+        Router::outputError($http_code, $message);
         exit();
     }
 
@@ -201,7 +201,7 @@ abstract class Controller
         if ($this->router) return $this->router->forbidden($message, $http_code);
         
         if (!isset($message)) $message = "Sorry, you are not allowed to view this page";
-        Router::outputHttpError($http_code, $message);
+        Router::outputError($http_code, $message);
         exit();
     }
 
@@ -215,7 +215,7 @@ abstract class Controller
         if ($this->router) return $this->router->notFound($message, $http_code);
         
         if (!isset($message)) $message = "Sorry, this page does not exist";
-        Router::outputHttpError($http_code, $message);
+        Router::outputError($http_code, $message);
         exit();
     }
     
@@ -230,7 +230,7 @@ abstract class Controller
     {
         if ($this->router) return $this->router->error($message, $http_code);
         
-        Router::outputHttpError($http_code, $message);
+        Router::outputError($http_code, $message);
         exit();
     }
     
