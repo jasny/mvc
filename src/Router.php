@@ -253,7 +253,7 @@ class Router
         $this->getRoutes(); // Make sure the routes are initialised
         $ret = null;
         
-        if ($url !== '/') $url = rtrim($url, '/');
+        $url = '/' . trim($url, '/');
         if (substr($url, 0, 2) == '/:') $url = substr($url, 2);
 
         foreach (array_keys($this->routes) as $route) {
