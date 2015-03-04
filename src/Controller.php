@@ -170,7 +170,7 @@ abstract class Controller
      */
     protected function back()
     {
-        $this->redirect($this->router->getLocalReferer() ?: '/', 303);
+        $this->redirect($this->getLocalReferer() ?: '/', 303);
     }
     
     /**
