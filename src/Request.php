@@ -102,7 +102,7 @@ class Request
     public static function getMethod()
     {
         return static::$allowMethodOverride && !empty($_POST['_method']) ?
-            strtoupper(!empty($_POST['_method'])) :
+            strtoupper($_POST['_method']) :
             strtoupper($_SERVER['REQUEST_METHOD']);
     }
     
