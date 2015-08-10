@@ -50,19 +50,6 @@ class Router
     
     
     /**
-     * The chained error handler
-     * @var callback
-     */
-    protected $prevErrorHandler;
-    
-    /**
-     * The chained exception handler
-     * @var callback
-     */
-    protected $prevExceptionHandler;
-    
-    
-    /**
      * Class constructor
      * 
      * @param array $routes  Array with route objects
@@ -191,6 +178,7 @@ class Router
     {
         return ($this->getBase() ?: '/') . ltrim($url, '/');
     }
+
 
     /**
      * Set the URL to route
@@ -438,63 +426,6 @@ class Router
 
     
     /**
-     * Enable router to handle fatal errors.
-     * 
-     * @param boolean $callPrevious  Call previous error handler
-     */
-    public function handleErrors($callPrevious = true)
-    {
-        $prevErrorHandler = set_error_handler(array($this, 'onError'));
-        $prevExceptionHandler = set_exception_handler(array($this, 'onException'));
-        
-        if ($callPrevious) {
-            $this->prevErrorHandler = $prevErrorHandler;
-            $this->prevExceptionHandler = $prevExceptionHandler;
-        }
-    }
-    
-    /**
-     * Error handler callback
-     * 
-     * @param int    $code
-     * @param string $message
-     * @param string $file
-     * @param int    $line
-     * @param array  $context
-     * @return boolean
-     */
-    public function onError($code, $message, $file, $line, $context)
-    {
-        if ($code & (E_RECOVERABLE_ERROR | E_USER_ERROR)) {
-            $error = get_defined_vars();
-            $this->displayError(null, 500, $error);
-        }
-        
-        if ($this->prevErrorHandler) {
-            call_user_func($this->prevErrorHandler, $code, $message, $file, $line, $context);
-        }
-        
-        if ($code & (E_RECOVERABLE_ERROR | E_USER_ERROR)) {
-            exit();
-        }
-    }
-
-    /**
-     * Exception handler callback
-     * 
-     * @param Exception $exception
-     * @return boolean
-     */
-    public function onException($exception)
-    {
-        $this->error(null, 500, $exception);
-        if ($this->prevExceptionHandler) call_user_func($this->prevExceptionHandler, $exception);
-        
-        exit();
-    }
-    
-
-    /**
      * Redirect to another page
      * 
      * @param string $url 
@@ -610,17 +541,9 @@ class Router
      * @param string $path
      * @return boolean
      */
-    public static function fnmatch($pattern, $path)
+    protected static function fnmatch($pattern, $path)
     {
-        $quoted = preg_quote($pattern, '~');
-        $step1 = strtr($quoted, ['\?' => '[^/]', '\*' => '[^/]*', '/\*\*' => '(?:/.*)?', '#' => '\d+', '\[' => '[',
-            '\]' => ']', '\-' => '-', '\{' => '{', '\}' => '}']);
-        $step2 = preg_replace_callback('~{[^\}]+}~', function($part) {
-                return '(' . substr(strtr($part[0], ',', '|'), 1, -1) . ')';
-            }, $step1);
-        $regex = rawurldecode($step2);
-
-        return (boolean)preg_match("~^{$regex}$~", $path);
+        return fnmatch_extended($pattern, $path);
     }
 
     /**
@@ -759,7 +682,7 @@ class Router
      */
     protected static function getControllerClass($controller)
     {
-        return self::camelcase($controller) . 'Controller';
+        return camelcase($controller) . 'Controller';
     }
     
     /**
@@ -770,20 +693,9 @@ class Router
      */
     protected static function getActionMethod($action)
     {
-        return lcfirst(self::camelcase($action) . 'Action');
+        return lcfirst(camelcase($action) . 'Action');
     }
     
-    /**
-     * CamelCase a word
-     * 
-     * @param string $string
-     * @return string
-     */
-    protected static function camelcase($string)
-    {
-        return strtr(ucwords(strtr($string, '_-', '  ')), [' ' => '']);
-    }
-
     
     // Proxy methods for Jasny\DB\Request. Allows overloading for customized Request class.
     

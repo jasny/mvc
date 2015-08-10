@@ -15,7 +15,8 @@
         "source": "https://github.com/jasny/mvc"
     },
     "require": {
-        "php": ">=5.4.0"
+        "php": ">=5.4.0",
+        "jasny/php-functions": "^1.1"
     },
     "autoload": {
         "psr-4": {
