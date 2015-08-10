@@ -339,8 +339,9 @@ class Router
         if (isset($route->fn)) return $this->routeToCallback($route);
         if (isset($route->file)) return $this->routeToFile($route);
         
-        trigger_error("Failed to route using '{$route->route}': Neither 'controller', 'fn' or 'file' is set",
-            E_USER_WARNING);
+        $warn = "Failed to route using '{$route->route}': Neither 'controller', 'fn' or 'file' is set";
+        trigger_error($warn, E_USER_WARNING);
+        
         return false;
     }
 
@@ -354,13 +355,18 @@ class Router
     {
         $class = $this->getControllerClass($route->controller);
         $method = $this->getActionMethod(isset($route->action) ? $route->action : null);
-        $args = isset($route->args) ? $route->args : [];
-
+        
         if (!class_exists($class)) return false;
 
         $controller = new $class($this);
         if (!is_callable([$controller, $method])) return false;
-        
+
+        if (isset($route->args)) {
+            $args = $route->args;
+        } elseif (method_exists($controller, $method)) {
+            $args = static::getFunctionArgs($route, new \ReflectionMethod($controller, $method));
+        }
+
         $ret = call_user_func_array([$controller, $method], $args);
         return isset($ret) ? $ret : true;
     }
@@ -374,12 +380,15 @@ class Router
     protected function routeToCallback($route)
     {
         if (!is_callable($route->fn)) {
-            trigger_error("Failed to route using '{$route->route}': Invalid callback."
-                    , E_USER_WARNING);
+            trigger_error("Failed to route using '{$route->route}': Invalid callback.", E_USER_WARNING);
             return false;
         }
         
-        $args = isset($route->args) ? $route->args : [];
+        if (isset($route->args)) {
+            $args = $route->args;
+        } elseif (function_exists($route->fn)) {
+            $args = static::getFunctionArgs($route, new \ReflectionFunction($route->fn));
+        }
         
         return call_user_func_array($route->fn, $args);
     }
@@ -400,11 +409,11 @@ class Router
         }
 
         if ($route->file[0] === '~' || strpos($route->file, '..') !== false || strpos($route->file, ':') !== false) {
-            trigger_error("Won't route using '{$route->route}': '~', '..' and ':' not allowed in filename.",
-                E_USER_WARNING);
+            $warn = "Won't route using '{$route->route}': '~', '..' and ':' not allowed in filename.";
+            trigger_error($warn, E_USER_WARNING);
             return false;
         }
-
+        
         return include $file;
     }
     
@@ -590,8 +599,8 @@ class Router
      */
     public static function splitUrl($url)
     {
-        $url = parse_url(trim($url, '/'), PHP_URL_PATH);
-        return $url ? explode('/', $url) : array();
+        $path = parse_url(trim($url, '/'), PHP_URL_PATH);
+        return $path ? explode('/', $path) : array();
     }
 
     /**
@@ -603,13 +612,13 @@ class Router
      */
     public static function fnmatch($pattern, $path)
     {
-        $regex = preg_quote($pattern, '~');
-        $regex = strtr($regex, ['\?' => '[^/]', '\*' => '[^/]*', '/\*\*' => '(?:/.*)?', '#' => '\d+', '\[' => '[',
+        $quoted = preg_quote($pattern, '~');
+        $step1 = strtr($quoted, ['\?' => '[^/]', '\*' => '[^/]*', '/\*\*' => '(?:/.*)?', '#' => '\d+', '\[' => '[',
             '\]' => ']', '\-' => '-', '\{' => '{', '\}' => '}']);
-        $regex = preg_replace_callback('~{[^\}]+}~', function($part) {
+        $step2 = preg_replace_callback('~{[^\}]+}~', function($part) {
                 return '(' . substr(strtr($part[0], ',', '|'), 1, -1) . ')';
-            }, $regex);
-        $regex = rawurldecode($regex);
+            }, $step1);
+        $regex = rawurldecode($step2);
 
         return (boolean)preg_match("~^{$regex}$~", $path);
     }
@@ -706,6 +715,41 @@ class Router
         return array(null);
     }
     
+    
+    /**
+     * Get the arguments for a function from a route using reflection
+     * 
+     * @param object $route
+     * @param \ReflectionFunctionAbstract $refl
+     * @return array
+     */
+    protected static function getFunctionArgs($route, \ReflectionFunctionAbstract $refl)
+    {
+        $args = [];
+        $params = $refl->getParameters();
+
+        foreach ($params as $param) {
+            $key = $param->name;
+
+            if (property_exists($route, $key)) {
+                $value = $route->{$key};
+            } else {
+                if (!$param->isOptional()) {
+                    $fn = $refl instanceof \ReflectionMethod
+                        ? $refl->getDeclaringClass()->getName() . ':' . $refl->getName()
+                        : $refl->getName();
+                    
+                    trigger_error("Missing argument '$key' for $fn()", E_USER_WARNING);
+                }
+                
+                $value = $param->isDefaultValueAvailable() ? $param->getDefaultValue() : null;
+            }
+
+            $args[$key] = $value;
+        }
+        
+        return $args;
+    }
     
     /**
      * Get the class name of the controller
