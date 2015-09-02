@@ -52,6 +52,36 @@ class Request
 
     
     /**
+     * Get the client IP address
+     * 
+     * @param boolean|string $proxy  Trust proxy (true = all proxies or CIDR)
+     * @return string
+     */
+    public static function getClientIp($proxy = false)
+    {
+        if (!isset($_SERVER['REMOTE_ADDR'])) return null;
+        
+        if (
+            is_string($proxy) &&
+            ip_in_cidr($_SERVER['REMOTE_ADDR'], $proxy) &&
+            !empty($_SERVER['HTTP_X_FORWARDED_FOR'])
+        ) {
+            list($ip) = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            return $ip;
+        }
+        
+        if ($proxy === true && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            return end($ips);
+        }
+        
+        if (isset($_SERVER['REMOTE_ADDR'])) return $_SERVER['REMOTE_ADDR'];
+        if (isset($_SERVER['HTTP_CLIENT_IP'])) return $_SERVER['HTTP_CLIENT_IP'];
+        
+        return null;
+    }
+    
+    /**
      * Get the HTTP protocol
      * 
      * @return string;
