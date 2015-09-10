@@ -537,9 +537,9 @@ class Request
     /**
      * Output an HTTP error
      * 
-     * @param int           $httpCode  HTTP status code
-     * @param string|object $message
-     * @param string        $format    The output format (auto detect by default)
+     * @param int    $httpCode  HTTP status code
+     * @param mixed  $message
+     * @param string $format    The output format (auto detect by default)
      */
     public static function outputError($httpCode, $message, $format=null)
     {
@@ -559,28 +559,24 @@ class Request
                 return static::outputErrorXml($httpCode, $message);
             
             case 'image':
-                $format = 'png';
             case 'png':
             case 'gif':
             case 'jpeg':
+                if ($format === 'image') $format = 'png';
                 return static::outputErrorImage($httpCode, $message, $format);
 
-            case 'html':
-                static::respondWith($httpCode, 'html');
-                return static::outputErrorHTML($message);
-                
             case 'text':
+            case 'html':
             default:
-                static::respondWith($httpCode, 'text');
-                return static::outputErrorText($message);
+                return static::outputErrorText($httpCode, $message, $format);
         }
     }
     
     /**
      * Output error as json
      * 
-     * @param int           $httpCode
-     * @param string|object $error
+     * @param int   $httpCode
+     * @param mixed $error
      */
     protected static function outputErrorJson($httpCode, $error)
     {
@@ -594,8 +590,8 @@ class Request
     /**
      * Output error as xml
      * 
-     * @param int           $httpCode
-     * @param string|object $error
+     * @param int    $httpCode
+     * @param mixed  $error
      */
     protected static function outputErrorXml($httpCode, $error)
     {
@@ -616,8 +612,9 @@ class Request
     /**
      * Output an error image
      * 
-     * @param string        $format  'jpeg', 'png' or 'gif'
-     * @param string|object $error
+     * @param int    $httpCode
+     * @param string $format  'jpeg', 'png' or 'gif'
+     * @param mixed  $error
      */
     protected static function outputErrorImage($httpCode, $format, $error=null)
     {
@@ -640,14 +637,20 @@ class Request
         static::respondWith($httpCode, $format);
         static::output($image);
     }
-    
+
     /**
-     * Output an error as HTML
+     * Output an error as text or HTML
      * 
-     * @param string|object $error
+     * @param int    $httpCode
+     * @param mixed  $error
+     * @param string $format  'text' or 'html'
      */
-    protected static function outputErrorHTML($error)
+    protected static function outputErrorText($httpCode, $error, $format)
     {
+        if ($format !== 'html') $format = 'text';
+        
+        static::respondWith($httpCode, $format);
+        
         if (is_resource($error)) {
             echo "Unexpected error";
             trigger_error("An error occured, but the message is a " . get_resource_type($error) . " resource",
@@ -655,11 +658,26 @@ class Request
             return;
         }
         
+        if (is_array($error) && count($error) === 1 && key($error) === 0) {
+            $error = $error[0];
+        }
+        
         if (is_scalar($error) || (is_object($error) && method_exists($error, '__toString'))) {
             echo $error;
-            return;
+        } elseif ($format === 'html') {
+            static::outputErrorListAsHTML($error);
+        } else {
+            static::outputErrorListAsText($error);
         }
-
+    }
+    
+    /**
+     * Output a list of errors as HTML
+     * 
+     * @param mixed $error
+     */
+    protected function outputErrorListAsHTML($error)
+    {
         if (is_int(key($error))) {
             echo "<ul>";
             foreach ($error as $key => $value) {
@@ -676,29 +694,16 @@ class Request
     }
     
     /**
-     * Output an error as text
+     * Output a list of errors as text
      * 
-     * @param string|object $error
-     * @param int           $indent
+     * @param mixed $error
+     * @param int   $indent
      */
-    protected static function outputErrorText($error, $indent = 0)
+    protected function outputErrorListAsText($error, $indent = 0)
     {
-        if (is_resource($error)) {
-            echo "Unexpected error";
-            trigger_error("An error occured, but the message is a " . get_resource_type($error) . " resource",
-                E_USER_WARNING);
-            return;
-        }
-        
-        if (is_scalar($error) || (is_object($error) && method_exists($error, '__toString'))) {
-            echo $error;
-            return;
-        }
-        
-        if ($indent > 0) echo "\n";
-        
         foreach ($error as $key => $value) {
-            echo str_repeat(" ", $indent), is_int($key) ? '- ' : $key . ': ',
+            echo str_repeat(" ", $indent),
+                is_int($key) ? '- ' : $key . ': ',
                 static::outputErrorText($value, $indent + 2), "\n";
         }
     }
