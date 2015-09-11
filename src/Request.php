@@ -182,7 +182,7 @@ class Request
     public static function getInput()
     {
         switch (static::getInputFormat('short')) {
-            case 'post': $_POST + static::getPostedFiles();
+            case 'post': return $_POST + static::getPostedFiles();
             case 'json': return json_decode(file_get_contents('php://input'), true);
             case 'xml':  return simplexml_load_string(file_get_contents('php://input'));
             default:     return file_get_contents('php://input');
