@@ -644,12 +644,13 @@ class Request
      * @param int    $httpCode
      * @param mixed  $error
      * @param string $format  'text' or 'html'
+     * @param int    $indent
      */
-    protected static function outputErrorText($httpCode, $error, $format)
+    protected static function outputErrorText($httpCode, $error, $format, $indent = 0)
     {
         if ($format !== 'html') $format = 'text';
         
-        static::respondWith($httpCode, $format);
+        if (isset($httpCode)) static::respondWith($httpCode, $format);
         
         if (is_resource($error)) {
             echo "Unexpected error";
@@ -667,7 +668,7 @@ class Request
         } elseif ($format === 'html') {
             static::outputErrorListAsHTML($error);
         } else {
-            static::outputErrorListAsText($error);
+            static::outputErrorListAsText($error, $indent);
         }
     }
     
@@ -699,12 +700,12 @@ class Request
      * @param mixed $error
      * @param int   $indent
      */
-    protected function outputErrorListAsText($error, $indent = 0)
+    protected function outputErrorListAsText($error, $indent)
     {
         foreach ($error as $key => $value) {
             echo str_repeat(" ", $indent),
                 is_int($key) ? '- ' : $key . ': ',
-                static::outputErrorText($value, $indent + 2), "\n";
+                static::outputErrorText(null, $value, 'text', $indent + 2), "\n";
         }
     }
 }
