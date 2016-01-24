@@ -682,13 +682,13 @@ class Request
         if (is_int(key($error))) {
             echo "<ul>";
             foreach ($error as $key => $value) {
-                echo "<li>", static::outputErrorHTML($value), "</li>";
+                echo "<li>", static::outputErrorText(null, $value, 'html'), "</li>";
             }
             echo "</ul>";
         } else {
             echo "<dl>";
             foreach ($error as $key => $value) {
-                echo "<dt>", $key, "</dt><dd>", static::outputErrorHTML($value), "</dd>";
+                echo "<dt>", $key, "</dt><dd>", static::outputErrorText(null, $value, 'html'), "</dd>";
             }
             echo "</dl>";
         }
