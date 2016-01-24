@@ -259,7 +259,7 @@ class Request
     {
         // Explicitly set as Content-Type response header
         foreach (headers_list() as $header) {
-            if (strpos($header, 'Content-Type:') === 0) {
+            if (stripos($header, 'Content-Type:') === 0) {
                 $mime = trim(explode(';', substr($header, 13))[0]);
                 break;
             }
