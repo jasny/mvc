@@ -682,7 +682,7 @@ class Router
      */
     protected static function getControllerClass($controller)
     {
-        return \Jasny\camelcase($controller) . 'Controller';
+        return \Jasny\studlycase($controller) . 'Controller';
     }
     
     /**
@@ -693,7 +693,7 @@ class Router
      */
     protected static function getActionMethod($action)
     {
-        return lcfirst(\Jasny\camelcase($action) . 'Action');
+        return \Jasny\camelcase($action) . 'Action';
     }
     
     
