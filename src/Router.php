@@ -543,7 +543,7 @@ class Router
      */
     protected static function fnmatch($pattern, $path)
     {
-        return fnmatch_extended($pattern, $path);
+        return \Jasny\fnmatch($pattern, $path);
     }
 
     /**
@@ -682,7 +682,7 @@ class Router
      */
     protected static function getControllerClass($controller)
     {
-        return Jasny\camelcase($controller) . 'Controller';
+        return \Jasny\camelcase($controller) . 'Controller';
     }
     
     /**
@@ -693,7 +693,7 @@ class Router
      */
     protected static function getActionMethod($action)
     {
-        return lcfirst(Jasny\camelcase($action) . 'Action');
+        return lcfirst(\Jasny\camelcase($action) . 'Action');
     }
     
     

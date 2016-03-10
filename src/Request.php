@@ -63,7 +63,7 @@ class Request
         
         if (
             is_string($proxy) &&
-            Jasny\ip_in_cidr($_SERVER['REMOTE_ADDR'], $proxy) &&
+            \Jasny\ip_in_cidr($_SERVER['REMOTE_ADDR'], $proxy) &&
             !empty($_SERVER['HTTP_X_FORWARDED_FOR'])
         ) {
             list($ip) = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
