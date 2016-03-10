@@ -16,7 +16,7 @@
     },
     "require": {
         "php": ">=5.4.0",
-        "jasny/php-functions": "^1.1"
+        "jasny/php-functions": "^2.0"
     },
     "autoload": {
         "psr-4": {
