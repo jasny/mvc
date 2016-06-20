@@ -311,7 +311,7 @@ class Router
      * @param object $overwrite
      * @return boolean|mixed  Whatever the controller returns or true on success
      */
-    protected function routeTo($route, $overwrite=[])
+    public function routeTo($route, $overwrite=[])
     {
         if (!is_object($route)) {
             $match = $this->findRoute(null, $route);
@@ -374,6 +374,8 @@ class Router
         
         if (isset($route->args)) {
             $args = $route->args;
+        } elseif (is_array($route->fn)) {
+            $args = static::getFunctionArgs($route, new \ReflectionMethod($route->fn[0], $route->fn[1]));
         } elseif (function_exists($route->fn)) {
             $args = static::getFunctionArgs($route, new \ReflectionFunction($route->fn));
         }
@@ -561,7 +563,9 @@ class Router
         foreach ($vars as $key=>$var) {
             if (!isset($var)) continue;
             
-            if (!is_scalar($var)) {
+            if (is_object($var) && !$var instanceof \stdClass) {
+                $part = array($var);
+            } elseif (!is_scalar($var)) {
                 $part = array(static::bind($var, $parts));
             } elseif ($var[0] === '$') {
                 $options = array_map('trim', explode('|', $var));
