@@ -558,9 +558,9 @@ class Router
     protected static function bind($vars, array $parts)
     {
         $values = [];
-        $type = is_array($vars) || is_int(reset($vars)) ? 'numeric' : 'assoc';
+        $type = is_array($vars) && is_int(reset(array_keys($vars))) ? 'numeric' : 'assoc';
 
-        foreach ($vars as $key=>$var) {
+        foreach ($vars as $key => $var) {
             if (!isset($var)) continue;
             
             if (is_object($var) && !$var instanceof \stdClass) {
@@ -585,7 +585,10 @@ class Router
             }
         }
 
-        if ($type === 'assoc') $values = (object)$values;
+        if (is_object($vars) && $type === 'assoc') {
+            $values = (object)$values;
+        }
+        
         return $values;
     }
     
