@@ -182,7 +182,7 @@ class Request
     public static function getInput()
     {
         switch (static::getInputFormat('short')) {
-            case 'post': return array_replace_recursive($_POST, static::getPostedFiles());
+            case 'post': return array_replace_recursive($_POST, static::groupUploadedFiles($_FILES));
             case 'json': return json_decode(file_get_contents('php://input'), true);
             case 'xml':  return simplexml_load_string(file_get_contents('php://input'));
             default:     return file_get_contents('php://input');
@@ -190,24 +190,29 @@ class Request
     }
     
     /**
-     * Get $_FILES properly grouped.
+     * Group data as provided by $_FILES
      * 
+     * @param array   $array
      * @return array
      */
-    protected static function getPostedFiles()
+    protected static function groupUploadedFiles(array $array)
     {
-        $files = $_FILES;
+        $files = [];
         
-        foreach ($files as &$file) {
-            if (!is_array($file['error'])) continue;
+        foreach ($array as $key => $values) {
+            if (!is_array($values['error'])) {
+                $files[$key] = $values;
+                continue;
+            }
             
-            $group = [];
-            foreach (array_keys($file['error']) as $key) {
-                foreach (array_keys($file) as $elem) {
-                    $group[$key][$elem] = $file[$elem][$key];
+            $rearranged = [];
+            foreach ($values as $property => $propertyValues) {
+                foreach ($propertyValues as $subkey => $value) {
+                    $rearranged[$subkey][$property] = $value;
                 }
             }
-            $file = $group;
+            
+            $files[$key] = static::groupUploadedFiles($rearranged);
         }
         
         return $files;
