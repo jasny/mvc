@@ -1,7 +1,8 @@
 {
     "name": "jasny/mvc",
+    "type": "metapackage",
     "description": "The basics for an MVC application",
-    "keywords": ["MVC", "controller", "routing", "router"],
+    "keywords": ["MVC", "controller", "routing", "router", "PSR-7"],
     "license": "MIT",
     "authors": [
         {
@@ -10,17 +11,14 @@
             "homepage": "http://www.jasny.net"
         }
     ],
-    "support": {
-        "issues": "https://github.com/jasny/mvc/issues",
-        "source": "https://github.com/jasny/mvc"
-    },
     "require": {
-        "php": ">=5.4.0",
-        "jasny/php-functions": "^2.0"
+        "php": ">=5.6.0",
+        "jasny/http-message": "^1.0",
+        "jasny/router": "^1.0",
+        "jasny/controller": "^1.0"
     },
-    "autoload": {
-        "psr-4": {
-            "Jasny\\MVC\\": "src/"
-        }
+    "require-dev": {
+        "jasny/php-code-quality": "^2.0",
+        "mikey179/vfsStream": "^1.6"
     }
 }
