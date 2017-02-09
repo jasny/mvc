@@ -14,7 +14,8 @@
     "require": {
         "php": ">=5.6.0",
         "jasny/http-message": "^1.0",
-        "jasny/router": "^1.0",
+        "jasny/router": "^1.2",
+        "jasny/view": "^1.0@beta",
         "jasny/controller": "^1.0"
     },
     "require-dev": {

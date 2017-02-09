@@ -25,7 +25,7 @@ class TestController extends Controller
     ];
     
     
-    protected function beforeActionRun()
+    protected function before()
     {
         $this->respondWith('text/plain');
         $this->byDefaultSerializeTo('json');
