@@ -545,7 +545,7 @@ class Router
      */
     protected static function fnmatch($pattern, $path)
     {
-        return \Jasny\fnmatch($pattern, $path);
+        return \Jasny\fnmatch_extended($pattern, $path);
     }
 
     /**
